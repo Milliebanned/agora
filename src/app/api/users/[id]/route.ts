@@ -3,11 +3,12 @@ import prisma from '@/lib/db'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         reputationScores: true,
         sentAgreements: { where: { status: 'completed' }, select: { id: true } },
@@ -19,13 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const rep = user.reputationScores?.[0] || {
-      totalAgreements: 0,
-      completedAgreements: 0,
-      avgDeliveryDays: 0,
-      disputeRate: 0,
-      trustScore: 50,
-    }
+    const rep = user.reputationScores
 
     return NextResponse.json({
       id: user.id,
@@ -33,7 +28,13 @@ export async function GET(
       displayName: user.displayName,
       bio: user.bio,
       createdAt: user.createdAt,
-      reputation: rep,
+      reputation: {
+        totalAgreements: rep?.totalAgreements ?? 0,
+        completedAgreements: rep?.completedAgreements ?? 0,
+        avgDeliveryDays: Number(rep?.avgDeliveryDays ?? 0),
+        disputeRate: Number(rep?.disputeRate ?? 0),
+        trustScore: rep?.trustScore ?? 50,
+      },
       completedCount: (user.sentAgreements?.length || 0) + (user.receivedAgreements?.length || 0),
     })
   } catch (error) {
@@ -44,9 +45,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -56,7 +58,7 @@ export async function PATCH(
     const { displayName, bio } = await request.json()
 
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...(displayName && { displayName }),
         ...(bio && { bio }),

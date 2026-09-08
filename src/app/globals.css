@@ -2,49 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Linear-inspired system: darkness is the substrate, not a theme.
+   Elevation comes from hairline borders and surface progression
+   (void -> carbon -> obsidian -> graphite), not layered shadows. */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 3.6%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.6%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.6%;
-  --muted: 0 0% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --accent: 0 84.2% 60.2%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 89.8%;
-  --input: 0 0% 89.8%;
-  --ring: 0 84.2% 60.2%;
-  --radius: 0.5rem;
-}
+  --background: #08090a;
+  --card: #0f1011;
+  --surface: #161718;
+  --border: #23252a;
+  --border-strong: #383b3f;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 0 0% 3.6%;
-    --foreground: 0 0% 98.2%;
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 98.2%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 98.2%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 84.2% 60.2%;
-    --accent-foreground: 0 0% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 10%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 84.2% 60.2%;
-  }
+  --foreground: #ffffff;
+  --secondary-foreground: #d0d6e0;
+  --muted-foreground: #8a8f98;
+  --subtle-foreground: #62666d;
+
+  --muted: #161718;
+
+  --accent: #e4f222;
+  --accent-foreground: #08090a;
+
+  --success: #27a644;
+  --destructive: #eb5757;
+  --info: #02b8cc;
+  --violet: #6366f1;
+  --lavender: #8b5cf6;
+
+  --radius: 12px;
+  --radius-control: 6px;
 }
 
 * {
-  @apply border-border;
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
-  @apply bg-background text-foreground;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: 'cv01', 'ss03', 'zero';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tight tracking per the type scale — larger text tightens more. */
+.tracking-display {
+  letter-spacing: -0.022em;
+}
+.tracking-heading {
+  letter-spacing: -0.012em;
+}
+.tracking-body {
+  letter-spacing: -0.011em;
+}
+
+/* Cards carry an inset hairline instead of an outer drop shadow. */
+.ring-hairline {
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.shadow-float {
+  box-shadow: rgba(8, 9, 10, 0.6) 0px 4px 32px;
 }

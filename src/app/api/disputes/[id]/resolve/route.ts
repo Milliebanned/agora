@@ -6,9 +6,10 @@ import prisma from '@/lib/db'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -20,7 +21,7 @@ export async function POST(
     }
 
     const dispute = await prisma.dispute.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         agreement: {
           include: {
@@ -94,7 +95,7 @@ Against: ${dispute.respondent.displayName}
 
     // Update dispute with verdict
     const updated = await prisma.dispute.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         status: 'under_review',
         caseSummary: verdict.case_summary,

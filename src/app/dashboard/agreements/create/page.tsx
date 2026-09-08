@@ -2,6 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Sparkles, AlertTriangle, ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/input'
+import { PageHeader, Spinner } from '@/components/ui/page'
 
 interface GeneratedAgreement {
   title: string
@@ -15,6 +20,8 @@ interface GeneratedAgreement {
   risk_flags: string[]
 }
 
+const EXAMPLE = 'Build me a landing page for 500 NIM in 7 days, with 3 rounds of revisions included'
+
 export default function CreateAgreementPage() {
   const router = useRouter()
   const [step, setStep] = useState<'input' | 'review' | 'creating'>('input')
@@ -27,7 +34,6 @@ export default function CreateAgreementPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-
     try {
       const res = await fetch('/api/ai/generate-agreement', {
         method: 'POST',
@@ -35,13 +41,8 @@ export default function CreateAgreementPage() {
         body: JSON.stringify({ userRequest: userInput }),
         credentials: 'include',
       })
-
-      if (!res.ok) {
-        throw new Error('Failed to generate agreement')
-      }
-
-      const data = await res.json()
-      setGenerated(data)
+      if (!res.ok) throw new Error('Could not generate the agreement. Check the AI API key is set.')
+      setGenerated(await res.json())
       setStep('review')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -54,7 +55,6 @@ export default function CreateAgreementPage() {
     if (!generated) return
     setStep('creating')
     setError('')
-
     try {
       const res = await fetch('/api/agreements', {
         method: 'POST',
@@ -71,11 +71,7 @@ export default function CreateAgreementPage() {
         }),
         credentials: 'include',
       })
-
-      if (!res.ok) {
-        throw new Error('Failed to create agreement')
-      }
-
+      if (!res.ok) throw new Error('Failed to create agreement')
       const agreement = await res.json()
       router.push(`/dashboard/agreements/${agreement.id}`)
     } catch (err) {
@@ -84,137 +80,172 @@ export default function CreateAgreementPage() {
     }
   }
 
-  if (step === 'input') {
+  if (step === 'creating') {
     return (
-      <div className="max-w-2xl mx-auto py-8">
-        <h1 className="text-3xl font-bold mb-6">Create Agreement</h1>
-
-        <form onSubmit={handleGenerate} className="bg-white p-8 rounded-lg shadow">
-          <label className="block mb-4">
-            <p className="font-semibold mb-2">What do you need?</p>
-            <p className="text-sm text-muted-foreground mb-3">
-              Describe your project or task in plain English. AI will generate a full contract with milestones,
-              terms, and risk flags.
-            </p>
-            <textarea
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              placeholder="e.g., Build me a landing page for $500 in 7 days with 3 revisions included"
-              className="w-full border border-border rounded-lg p-4 font-mono text-sm"
-              rows={5}
-            />
-          </label>
-
-          <button
-            type="submit"
-            disabled={loading || !userInput.trim()}
-            className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90 disabled:opacity-50"
-          >
-            {loading ? '🤖 AI Generating...' : 'Generate Agreement'}
-          </button>
-
-          {error && <p className="text-destructive text-sm mt-4">{error}</p>}
-        </form>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
+        <Spinner className="h-5 w-5" />
+        <p className="text-[15px] font-medium">Creating your agreement</p>
+        <p className="text-[13px] text-muted-foreground">Writing terms to the ledger…</p>
       </div>
     )
   }
 
   if (step === 'review' && generated) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
-        <h1 className="text-3xl font-bold mb-6">Review Agreement</h1>
+      <>
+        <button
+          onClick={() => setStep('input')}
+          className="mb-6 flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to description
+        </button>
 
-        <div className="bg-white p-8 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-2 gap-6 mb-8">
-            <div>
-              <p className="text-muted-foreground text-sm">Title</p>
-              <p className="text-xl font-bold">{generated.title}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-sm">Amount</p>
-              <p className="text-xl font-bold">{generated.amount_nim} NIM</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-sm">Timeline</p>
-              <p className="text-xl font-bold">{generated.timeline_days} days</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-sm">Milestones</p>
-              <p className="text-xl font-bold">{generated.milestones.length}</p>
-            </div>
+        <PageHeader title="Review agreement" description="Drafted by Claude from your description." />
+
+        <Card>
+          <div className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
+            {[
+              ['Amount', `${generated.amount_nim} NIM`],
+              ['Timeline', `${generated.timeline_days} days`],
+              ['Milestones', String(generated.milestones.length)],
+              ['Deliverables', String(generated.deliverables.length)],
+            ].map(([label, value]) => (
+              <div key={label} className="bg-card p-5">
+                <p className="text-[13px] text-muted-foreground">{label}</p>
+                <p className="mt-1.5 text-[20px] font-medium tabular-nums tracking-heading">
+                  {value}
+                </p>
+              </div>
+            ))}
           </div>
 
-          <div className="mb-6">
-            <h3 className="font-semibold mb-2">Scope</h3>
-            <p className="text-sm text-gray-600">{generated.scope}</p>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="font-semibold mb-2">Deliverables</h3>
-            <ul className="list-disc list-inside text-sm space-y-1">
-              {generated.deliverables.map((d, i) => (
-                <li key={i}>{d}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="font-semibold mb-2">Milestones</h3>
-            <div className="space-y-2">
-              {generated.milestones.map((m, i) => (
-                <div key={i} className="bg-slate-50 p-3 rounded">
-                  <p className="font-semibold text-sm">{m.title}</p>
-                  <p className="text-xs text-muted-foreground">{m.description}</p>
-                </div>
-              ))}
+          <div className="space-y-6 border-t border-border p-6">
+            <div>
+              <h2 className="text-[18px] font-medium tracking-heading">{generated.title}</h2>
+              <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">
+                {generated.scope}
+              </p>
             </div>
-          </div>
 
-          {generated.risk_flags.length > 0 && (
-            <div className="mb-6 bg-yellow-50 border border-yellow-200 p-4 rounded">
-              <h3 className="font-semibold mb-2 text-sm text-yellow-900">⚠️ Risk Flags</h3>
-              <ul className="list-disc list-inside text-sm space-y-1 text-yellow-800">
-                {generated.risk_flags.map((flag, i) => (
-                  <li key={i}>{flag}</li>
+            <div>
+              <p className="mb-2.5 text-[13px] font-medium text-secondary-foreground">
+                Deliverables
+              </p>
+              <ul className="space-y-1.5">
+                {generated.deliverables.map((d, i) => (
+                  <li key={i} className="flex gap-2.5 text-[14px] text-muted-foreground">
+                    <span className="font-mono text-[12px] text-subtle-foreground">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    {d}
+                  </li>
                 ))}
               </ul>
             </div>
-          )}
 
-          <div className="flex gap-4">
-            <button
-              onClick={() => {
-                setStep('input')
-                setGenerated(null)
-              }}
-              className="bg-muted text-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90"
-            >
-              Back
-            </button>
-            <button
-              onClick={handleCreate}
-              className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90"
-            >
-              Create Agreement
-            </button>
+            <div>
+              <p className="mb-2.5 text-[13px] font-medium text-secondary-foreground">Milestones</p>
+              <div className="overflow-hidden rounded-md shadow-hairline">
+                {generated.milestones.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`bg-white/[0.02] px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
+                  >
+                    <p className="text-[14px] text-secondary-foreground">{m.title}</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">{m.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div>
+                <p className="mb-1.5 text-[13px] font-medium text-secondary-foreground">
+                  Completion terms
+                </p>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  {generated.completion_conditions}
+                </p>
+              </div>
+              <div>
+                <p className="mb-1.5 text-[13px] font-medium text-secondary-foreground">
+                  Refund terms
+                </p>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  {generated.refund_conditions}
+                </p>
+              </div>
+            </div>
+
+            {generated.risk_flags.length > 0 && (
+              <div className="rounded-md border border-destructive/25 bg-destructive/[0.06] p-4">
+                <p className="mb-2 flex items-center gap-2 text-[13px] font-medium text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Risk flags
+                </p>
+                <ul className="space-y-1">
+                  {generated.risk_flags.map((flag, i) => (
+                    <li key={i} className="text-[13px] leading-relaxed text-destructive/85">
+                      {flag}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
-          {error && <p className="text-destructive text-sm mt-4">{error}</p>}
-        </div>
-      </div>
+          <div className="flex items-center gap-2.5 border-t border-border px-6 py-4">
+            <Button onClick={handleCreate}>Create agreement</Button>
+            <Button variant="secondary" onClick={() => setStep('input')}>
+              Edit description
+            </Button>
+            {error && <p className="ml-2 text-[13px] text-destructive">{error}</p>}
+          </div>
+        </Card>
+      </>
     )
   }
 
-  if (step === 'creating') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-lg font-semibold mb-2">Creating your agreement...</p>
-          <p className="text-muted-foreground">This may take a moment.</p>
-        </div>
-      </div>
-    )
-  }
+  return (
+    <>
+      <PageHeader
+        title="New agreement"
+        description="Describe the deal in plain English. Claude turns it into a structured contract."
+      />
 
-  return null
+      <Card>
+        <form onSubmit={handleGenerate} className="p-6">
+          <label htmlFor="deal" className="text-[13px] font-medium text-secondary-foreground">
+            What is the deal?
+          </label>
+          <Textarea
+            id="deal"
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            placeholder={EXAMPLE}
+            rows={5}
+            className="mt-2.5"
+          />
+          <button
+            type="button"
+            onClick={() => setUserInput(EXAMPLE)}
+            className="mt-2.5 text-[12px] text-subtle-foreground transition-colors hover:text-muted-foreground"
+          >
+            Use the example →
+          </button>
+
+          <div className="mt-5 flex items-center gap-3">
+            <Button type="submit" disabled={loading || !userInput.trim()}>
+              {loading ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+              {loading ? 'Drafting' : 'Generate agreement'}
+            </Button>
+            <span className="text-[12px] text-subtle-foreground">Takes a few seconds</span>
+          </div>
+
+          {error && <p className="mt-4 text-[13px] text-destructive">{error}</p>}
+        </form>
+      </Card>
+    </>
+  )
 }

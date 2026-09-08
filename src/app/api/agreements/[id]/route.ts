@@ -4,9 +4,10 @@ import prisma from '@/lib/db'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,7 +19,7 @@ export async function GET(
     }
 
     const agreement = await prisma.agreement.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         buyer: { select: { id: true, address: true, displayName: true } },
         seller: { select: { id: true, address: true, displayName: true } },
@@ -46,9 +47,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -60,7 +62,7 @@ export async function PATCH(
     }
 
     const agreement = await prisma.agreement.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     if (!agreement) {
@@ -75,7 +77,7 @@ export async function PATCH(
     const { title, description, amountNIM, deadline, deliverables, completionTerms, refundTerms, status, sellerId } = await request.json()
 
     const updated = await prisma.agreement.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...(title && { title }),
         ...(description && { description }),

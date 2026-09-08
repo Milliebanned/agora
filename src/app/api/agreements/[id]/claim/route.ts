@@ -4,9 +4,10 @@ import prisma from '@/lib/db'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,7 +19,7 @@ export async function POST(
     }
 
     const agreement = await prisma.agreement.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     if (!agreement) {
@@ -41,7 +42,7 @@ export async function POST(
 
     // Must have approved milestones (or all milestones completed for auto-release)
     const milestones = await prisma.milestone.findMany({
-      where: { agreementId: params.id },
+      where: { agreementId: id },
     })
 
     const allApproved = milestones.length > 0 && milestones.every((m) => m.status === 'approved')
@@ -65,7 +66,7 @@ export async function POST(
 
     // Mark as ready to claim
     const updated = await prisma.agreement.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         status: 'completed', // Mark as completed when claiming
       },
@@ -74,7 +75,7 @@ export async function POST(
     // Create claim transaction record
     await prisma.escrowTransaction.create({
       data: {
-        agreementId: params.id,
+        agreementId: id,
         type: 'claim',
         status: 'pending',
       },
@@ -83,7 +84,7 @@ export async function POST(
     // Add system message
     await prisma.message.create({
       data: {
-        agreementId: params.id,
+        agreementId: id,
         senderId: user.userId,
         type: 'system',
         content: `Funds release initiated. ${agreement.amountNIM} NIM will transfer to seller.`,

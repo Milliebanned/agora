@@ -27,7 +27,7 @@ export async function signSessionToken(userId: string, address: string): Promise
 export async function verifySessionToken(token: string): Promise<SessionJWT | null> {
   try {
     const verified = await jwtVerify(token, secret)
-    return verified.payload as SessionJWT
+    return verified.payload as unknown as SessionJWT
   } catch (err) {
     console.error('JWT verification failed:', err)
     return null
