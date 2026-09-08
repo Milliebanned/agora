@@ -45,6 +45,14 @@ Refund: ${agreement.refund_conditions}
     })
   } catch (error) {
     console.error('Agreement generation error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const detail = error instanceof Error ? error.message : String(error)
+    const missingKey = !process.env.ANTHROPIC_API_KEY
+    return NextResponse.json(
+      {
+        error: missingKey ? 'ANTHROPIC_API_KEY is not set' : 'Agreement generation failed',
+        detail,
+      },
+      { status: 500 },
+    )
   }
 }
