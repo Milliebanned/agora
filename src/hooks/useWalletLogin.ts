@@ -38,6 +38,17 @@ export function useWalletLogin() {
         return
       }
 
+      // The SDK's published types promise { publicKey, signature }; on-device
+      // it may not match. Report the real shape rather than silently sending
+      // undefined and getting a "Missing fields" rejection.
+      if (!signed.signature) {
+        setError(
+          `Wallet returned an unexpected shape. account=${JSON.stringify(address).slice(0, 80)} signed=${JSON.stringify(signed).slice(0, 200)}`,
+        )
+        setLoading(false)
+        return
+      }
+
       const verifyRes = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
