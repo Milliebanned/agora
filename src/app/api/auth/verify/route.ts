@@ -51,7 +51,10 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
+    // Detail is surfaced deliberately while the app is on testnet and being
+    // debugged on-device, where the server console is not reachable.
     console.error('Verification error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ error: 'Verification failed', detail: message }, { status: 500 })
   }
 }
