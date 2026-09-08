@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateAgreement } from '@/lib/claude'
+import { generateAgreement, checkRiskFlags } from '@/lib/claude'
 import { verifySessionToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    // Check auth
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -22,12 +21,28 @@ export async function POST(request: NextRequest) {
 
     // Generate agreement using Claude Sonnet
     const agreement = await generateAgreement(userRequest)
-
     if (!agreement) {
       return NextResponse.json({ error: 'Failed to generate agreement' }, { status: 500 })
     }
 
-    return NextResponse.json(agreement)
+    // Quick risk check
+    const allDetails = `
+Title: ${agreement.title}
+Scope: ${agreement.scope}
+Deliverables: ${agreement.deliverables.join(', ')}
+Timeline: ${agreement.timeline_days} days
+Amount: ${agreement.amount_nim} NIM
+Completion: ${agreement.completion_conditions}
+Refund: ${agreement.refund_conditions}
+`
+
+    const additionalRiskFlags = await checkRiskFlags(allDetails)
+    const allRiskFlags = [...(agreement.risk_flags || []), ...additionalRiskFlags]
+
+    return NextResponse.json({
+      ...agreement,
+      risk_flags: allRiskFlags,
+    })
   } catch (error) {
     console.error('Agreement generation error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

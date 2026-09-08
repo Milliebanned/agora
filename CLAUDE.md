@@ -51,17 +51,29 @@ Use structured output via tool use / JSON schema for agreement & mediation.
 
 **Cut:** reputation badges, global search, notification settings, file attachments, manual agreement builder, multi-sig escrow, DAO arbitration, insurance pools, cross-chain.
 
+## Accelerated 5-Day Build Plan
+
+**Days 1-5: Feature Development** → **Days 6-10: Testing & Polish**
+
+| Day | Focus | Deliverable |
+|-----|-------|-------------|
+| 1 | Auth + Agreement CRUD + AI Builder | Users can create agreements via AI |
+| 2 | HTLC Escrow (fund + claim) | Real escrow transactions on testnet |
+| 3 | Milestones + Reputation | Workflow from creation to completion |
+| 4 | Disputes + AI Mediator + Messaging | End-to-end demo flow works |
+| 5 | Dashboard + All UI + Polish | App is feature-complete + polished |
+
+**Days 6-10:** Testnet validation → Mainnet small tests → Mobile testing → Bug fixes → Demo recording → Submission
+
 ## Setup Checklist
 
 1. Install Node.js 18+ (`brew install node` or [nodejs.org](https://nodejs.org)).
-2. Create public GitHub repo (`nimtrust`).
-3. `npm install`
-4. Create Supabase project (free tier).
-5. Populate `.env.local`: `ANTHROPIC_API_KEY`, Supabase URL, Nimiq network (testnet first), JWT secret, HTLC timeout blocks.
-6. `npx prisma migrate dev --name init`
-7. Check `nimiq.dev` for official Claude Code skill; install if available.
-8. **Day 1 Spike:** validate HTLC transaction-signing method on testnet.
-9. `npm run dev` (localhost:3000)
+2. `npm install` from `/Users/Apple/nimtrust`
+3. Create Supabase project (free tier).
+4. Populate `.env.local`: `ANTHROPIC_API_KEY`, Supabase URL, Nimiq network (testnet), JWT secret.
+5. `npx prisma migrate dev --name init`
+6. `npm run dev` (localhost:3000)
+7. **Start building immediately** — follow Day 1 focus above.
 
 ## Project Structure
 
