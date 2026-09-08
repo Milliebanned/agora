@@ -5,9 +5,10 @@ import prisma from '@/lib/db'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,7 +20,7 @@ export async function POST(
     }
 
     const agreement = await prisma.agreement.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: { seller: true },
     })
 
@@ -58,7 +59,7 @@ export async function POST(
       type: 2, // HTLC account type
       sender: user.userId, // Buyer (funds provider)
       recipient: agreement.sellerId, // Seller (funds recipient)
-      balance: nimToSats(agreement.amountNIM),
+      balance: nimToSats(Number(agreement.amountNIM)),
       hash_root: hashRoot,
       hash_algorithm: 3, // SHA256
       hash_count: 1,
@@ -71,7 +72,7 @@ export async function POST(
 
     // Store HTLC details in DB
     const updated = await prisma.agreement.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         htlcHashRoot: hashRoot,
         htlcPreImage: preImage, // Store securely (in production, this should be encrypted/in secure storage)
@@ -83,7 +84,7 @@ export async function POST(
     // Create pending escrow transaction
     await prisma.escrowTransaction.create({
       data: {
-        agreementId: params.id,
+        agreementId: id,
         type: 'fund',
         status: 'pending',
         // txHash will be set after blockchain confirmation
@@ -93,7 +94,7 @@ export async function POST(
     // Add system message
     await prisma.message.create({
       data: {
-        agreementId: params.id,
+        agreementId: id,
         senderId: user.userId,
         type: 'system',
         content: `Escrow funding initiated: ${agreement.amountNIM} NIM locked`,

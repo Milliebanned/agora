@@ -4,9 +4,10 @@ import prisma from '@/lib/db'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -23,7 +24,7 @@ export async function POST(
     }
 
     const agreement = await prisma.agreement.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     if (!agreement) {
@@ -37,7 +38,7 @@ export async function POST(
 
     const milestone = await prisma.milestone.create({
       data: {
-        agreementId: params.id,
+        agreementId: id,
         title,
         description: description || '',
         status: 'pending',
@@ -47,7 +48,7 @@ export async function POST(
     // Add system message
     await prisma.message.create({
       data: {
-        agreementId: params.id,
+        agreementId: id,
         senderId: user.userId,
         type: 'system',
         content: `Milestone created: ${title}`,
@@ -63,9 +64,10 @@ export async function POST(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const session = request.cookies.get('session')?.value
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -82,7 +84,7 @@ export async function PATCH(
     }
 
     const agreement = await prisma.agreement.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     if (!agreement) {
@@ -93,7 +95,7 @@ export async function PATCH(
       where: { id: milestoneId },
     })
 
-    if (!milestone || milestone.agreementId !== params.id) {
+    if (!milestone || milestone.agreementId !== id) {
       return NextResponse.json({ error: 'Milestone not found' }, { status: 404 })
     }
 
@@ -120,7 +122,7 @@ export async function PATCH(
     // Add system message
     await prisma.message.create({
       data: {
-        agreementId: params.id,
+        agreementId: id,
         senderId: user.userId,
         type: 'system',
         content: `Milestone ${newStatus}: ${milestone.title}`,

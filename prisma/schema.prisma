@@ -76,7 +76,7 @@ model Milestone {
   title             String
   description       String   @db.Text
   status            String   @default("pending") // pending, submitted, approved, rejected
-  deliverable       String   @db.Text // Work submitted by seller
+  deliverable       String?  @db.Text // Work submitted by seller, set on submission
 
   createdAt         DateTime @default(now())
   submittedAt       DateTime?
@@ -127,8 +127,8 @@ model Dispute {
   status            String   @default("open") // open, under_review, resolved
 
   // AI Mediator Verdict
-  caseSummary       String   @db.Text?
-  findings          String   @db.Text?
+  caseSummary       String?  @db.Text
+  findings          String?  @db.Text
   recommendedOutcome String? // "release", "refund", "partial_refund", "escalate"
 
   createdAt         DateTime @default(now())

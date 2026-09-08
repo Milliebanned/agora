@@ -3,14 +3,53 @@
 
 import type { SessionJWT } from './types'
 
+// The real SDK's init() waits for the native Nimiq Pay provider handshake,
+// which never arrives outside the Nimiq Pay WebView (e.g. a desktop browser
+// during local dev). NEXT_PUBLIC_MOCK_WALLET=true swaps in a fake provider
+// so the wallet-connect flow is testable without a phone. Never set this in
+// a deployed/production build.
+const MOCK_WALLET = process.env.NEXT_PUBLIC_MOCK_WALLET === 'true'
+const PROVIDER_TIMEOUT_MS = 8000
+
+// SDK calls resolve to either the value or { error: { type, message } }.
+type ErrorLike = { error: { type: string; message: string } }
+
+function isError<T>(result: T | ErrorLike): result is ErrorLike {
+  return Boolean(result) && typeof result === 'object' && 'error' in (result as object)
+}
+
+function mockNimiqProvider() {
+  return {
+    listAccounts: async () => ['NQ07 0000 0000 0000 0000 0000 0000 0000 0000'],
+    sign: async (_message: string | { message: string; isHex?: boolean }) => ({
+      publicKey: '0x' + '0'.repeat(64),
+      signature: '0x' + '0'.repeat(128),
+    }),
+    isConsensusEstablished: async () => true,
+    getBlockNumber: async () => 1,
+  }
+}
+
+type NimiqLike = Awaited<ReturnType<typeof mockNimiqProvider>> | Record<string, any>
+
 // Initialize Nimiq SDK (browser-side)
-export async function initNimiq() {
+export async function initNimiq(): Promise<NimiqLike | null> {
   if (typeof window === 'undefined') return null
+
+  if (MOCK_WALLET) {
+    console.warn('Using mock Nimiq wallet provider (NEXT_PUBLIC_MOCK_WALLET=true) — dev only')
+    return mockNimiqProvider()
+  }
 
   try {
     const { init } = await import('@nimiq/mini-app-sdk')
-    const nimiq = await init()
-    return nimiq
+    // init() resolves only once the native Nimiq Pay provider answers the
+    // handshake. In an ordinary browser nothing ever answers, so race it
+    // against a timeout rather than leaving the caller hanging forever.
+    return await Promise.race([
+      init(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), PROVIDER_TIMEOUT_MS)),
+    ])
   } catch (err) {
     console.error('Failed to initialize Nimiq SDK:', err)
     return null
@@ -18,12 +57,17 @@ export async function initNimiq() {
 }
 
 // Get user's wallet addresses
-export async function getAccounts() {
+export async function getAccounts(): Promise<string[]> {
   const nimiq = await initNimiq()
   if (!nimiq) return []
 
   try {
-    return await nimiq.listAccounts()
+    const result = await nimiq.listAccounts()
+    if (isError(result)) {
+      console.error('listAccounts failed:', result.error.message)
+      return []
+    }
+    return result as string[]
   } catch (err) {
     console.error('Failed to list accounts:', err)
     return []
@@ -164,17 +208,24 @@ export async function claimHTLC(
   }
 }
 
-// Sign message for authentication challenge
-export async function signMessage(message: string) {
+// Sign message for authentication challenge.
+// The provider method is sign(), not signMessage(); it returns
+// { publicKey, signature } or an ErrorResponse.
+export async function signMessage(
+  message: string,
+): Promise<{ publicKey: string; signature: string } | null> {
   if (typeof window === 'undefined') return null
 
   try {
     const nimiq = await initNimiq()
     if (!nimiq) return null
 
-    // @ts-ignore - SDK method may not be fully typed
-    const signature = await nimiq.signMessage(message)
-    return signature
+    const result = await nimiq.sign(message)
+    if (isError(result)) {
+      console.error('sign failed:', result.error.message)
+      return null
+    }
+    return result as { publicKey: string; signature: string }
   } catch (err) {
     console.error('Failed to sign message:', err)
     return null

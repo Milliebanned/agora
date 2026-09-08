@@ -3,29 +3,20 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Scale } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { StatusBadge } from '@/components/ui/badge'
+import { PageHeader, EmptyState, PageLoading } from '@/components/ui/page'
+import { cn } from '@/lib/utils'
 
 interface Dispute {
   id: string
   status: string
   reason: string
   createdAt: string
-  agreement: {
-    id: string
-    title: string
-  }
-  opener: {
-    displayName: string
-  }
-  respondent: {
-    displayName: string
-  }
-}
-
-const statusColors: Record<string, string> = {
-  open: 'bg-red-100 text-red-800',
-  under_review: 'bg-yellow-100 text-yellow-800',
-  resolved: 'bg-green-100 text-green-800',
+  agreement: { id: string; title: string }
+  opener: { displayName: string }
+  respondent: { displayName: string }
 }
 
 export default function DisputesPage() {
@@ -34,72 +25,72 @@ export default function DisputesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const loadDisputes = async () => {
+    const load = async () => {
       try {
         const res = await fetch('/api/disputes', { credentials: 'include' })
-
         if (!res.ok) {
-          router.push('/login')
+          router.push('/')
           return
         }
-
-        const data = await res.json()
-        setDisputes(data)
+        setDisputes(await res.json())
       } catch (err) {
         console.error('Failed to load disputes:', err)
       } finally {
         setLoading(false)
       }
     }
-
-    loadDisputes()
+    load()
   }, [router])
 
+  if (loading) return <PageLoading />
+
   return (
-    <div className="max-w-6xl mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8">Disputes</h1>
+    <>
+      <PageHeader
+        title="Disputes"
+        description="Cases under review, and the AI mediator's verdicts."
+      />
 
-      {loading ? (
-        <p className="text-muted-foreground">Loading...</p>
-      ) : disputes.length === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="text-muted-foreground mb-4">No disputes yet</p>
-          <p className="text-sm text-muted-foreground">
-            Disputes are opened when agreement parties disagree. AI mediator reviews each case.
-          </p>
-        </div>
+      {disputes.length === 0 ? (
+        <EmptyState
+          icon={Scale}
+          title="No disputes"
+          description="If a deal stalls, either party can open a dispute. Claude reviews the agreement, milestone timeline, and messages, then issues a reasoned verdict."
+        />
       ) : (
-        <div className="space-y-4">
-          {disputes.map((dispute) => (
-            <Link key={dispute.id} href={`/dashboard/disputes/${dispute.id}`}>
-              <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold">{dispute.agreement.title}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">{dispute.reason}</p>
-                  </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      statusColors[dispute.status]
-                    }`}
-                  >
-                    {dispute.status.replace('_', ' ').toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-end text-sm">
-                  <div>
-                    <p className="text-muted-foreground">
-                      {dispute.opener.displayName} vs {dispute.respondent.displayName}
+        <div className="overflow-hidden rounded-lg shadow-hairline">
+          {disputes.map((d, i) => (
+            <Link key={d.id} href={`/dashboard/disputes/${d.id}`}>
+              <div
+                className={cn(
+                  'bg-card px-4 py-4 transition-colors hover:bg-surface',
+                  i > 0 && 'border-t border-border',
+                )}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5">
+                      <StatusBadge status={d.status.replace('_', ' ')} />
+                      <span className="truncate text-[15px] font-medium tracking-body">
+                        {d.agreement.title}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 line-clamp-1 text-[13px] text-muted-foreground">
+                      {d.reason}
+                    </p>
+                    <p className="mt-1 text-[12px] text-subtle-foreground">
+                      {d.opener.displayName} vs {d.respondent.displayName}
                     </p>
                   </div>
-                  <p className="text-muted-foreground text-xs">{formatDate(dispute.createdAt)}</p>
+                  <span className="shrink-0 text-[12px] text-subtle-foreground">
+                    {formatDate(d.createdAt)}
+                  </span>
                 </div>
               </div>
             </Link>
           ))}
         </div>
       )}
-    </div>
+    </>
   )
 }

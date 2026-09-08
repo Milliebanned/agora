@@ -2,118 +2,160 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { FileText, Plus, ArrowUpRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { StatusBadge } from '@/components/ui/badge'
+import { PageHeader, StatTile, EmptyState, PageLoading } from '@/components/ui/page'
 
-interface DashboardData {
-  activeCount: number
-  pendingCount: number
-  disputedCount: number
-  escrowBalance: number
-  trustScore: number
+interface Agreement {
+  id: string
+  title: string
+  status: string
+  amountNIM: number
+  deadline: string
+  htlcAddress?: string | null
 }
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [agreements, setAgreements] = useState<Agreement[]>([])
+  const [trustScore, setTrustScore] = useState(50)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const loadDashboard = async () => {
+    const load = async () => {
       try {
         const sessionRes = await fetch('/api/auth/session', { credentials: 'include' })
         if (!sessionRes.ok) {
-          router.push('/login')
+          router.push('/')
           return
         }
+        const session = await sessionRes.json()
 
-        const sessionData = await sessionRes.json()
+        const [agreementsRes, profileRes] = await Promise.all([
+          fetch('/api/agreements', { credentials: 'include' }),
+          fetch(`/api/users/${session.user.id}`, { credentials: 'include' }),
+        ])
 
-        // Fetch agreements
-        const agreementsRes = await fetch('/api/agreements', { credentials: 'include' })
-        const agreements = agreementsRes.ok ? await agreementsRes.json() : []
-
-        // Fetch user profile with reputation
-        const profileRes = await fetch(`/api/users/${sessionData.user.id}`, {
-          credentials: 'include',
-        })
-        const profile = profileRes.ok ? await profileRes.json() : null
-
-        const activeCount = agreements.filter((a: any) => a.status === 'active').length
-        const pendingCount = agreements.filter((a: any) => a.status === 'draft').length
-        const disputedCount = agreements.filter((a: any) => a.status === 'disputed').length
-
-        // Calculate escrow balance (total locked in active agreements)
-        const escrowBalance = agreements
-          .filter((a: any) => a.status === 'active' && a.htlcAddress)
-          .reduce((sum: number, a: any) => sum + a.amountNIM, 0)
-
-        setData({
-          activeCount,
-          pendingCount,
-          disputedCount,
-          escrowBalance,
-          trustScore: profile?.reputation?.trustScore || 50,
-        })
+        if (agreementsRes.ok) setAgreements(await agreementsRes.json())
+        if (profileRes.ok) {
+          const profile = await profileRes.json()
+          setTrustScore(profile?.reputation?.trustScore ?? 50)
+        }
       } catch (err) {
         console.error('Failed to load dashboard:', err)
       } finally {
         setLoading(false)
       }
     }
-
-    loadDashboard()
+    load()
   }, [router])
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
-  }
+  if (loading) return <PageLoading />
 
-  if (!data) {
-    return <div className="flex items-center justify-center min-h-screen">Error loading dashboard</div>
-  }
+  const active = agreements.filter((a) => a.status === 'active')
+  const pending = agreements.filter((a) => a.status === 'draft')
+  const disputed = agreements.filter((a) => a.status === 'disputed')
+  const escrowBalance = active
+    .filter((a) => a.htlcAddress)
+    .reduce((sum, a) => sum + Number(a.amountNIM), 0)
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto p-8">
-        <h1 className="text-4xl font-bold mb-8">Dashboard</h1>
+    <>
+      <PageHeader
+        title="Home"
+        description="Your active deals, escrow, and standing at a glance."
+        action={
+          <Link href="/dashboard/agreements/create">
+            <Button size="default">
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              New agreement
+            </Button>
+          </Link>
+        }
+      />
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <p className="text-muted-foreground text-sm mb-1">Active Agreements</p>
-            <p className="text-3xl font-bold">{data.activeCount}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <p className="text-muted-foreground text-sm mb-1">Pending</p>
-            <p className="text-3xl font-bold">{data.pendingCount}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <p className="text-muted-foreground text-sm mb-1">Escrow Balance</p>
-            <p className="text-3xl font-bold">{data.escrowBalance} NIM</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <p className="text-muted-foreground text-sm mb-1">Trust Score</p>
-            <p className="text-3xl font-bold">{data.trustScore}/100</p>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-4 mb-8">
-          <button className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90">
-            Create Agreement
-          </button>
-          <button className="bg-card border border-border text-foreground px-6 py-2 rounded-lg font-semibold hover:bg-muted">
-            View Agreements
-          </button>
-        </div>
-
-        {/* Upcoming Features Placeholder */}
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="text-muted-foreground mb-4">
-            More features coming soon: disputes, reputation, AI assistant
-          </p>
-          <p className="text-sm text-muted-foreground">See /dashboard/agreements to explore</p>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Active" value={active.length} />
+        <StatTile label="Pending" value={pending.length} />
+        <StatTile
+          label="In escrow"
+          value={escrowBalance.toFixed(2)}
+          hint="NIM locked in HTLCs"
+          accent={escrowBalance > 0}
+        />
+        <StatTile label="Trust score" value={`${Math.round(trustScore)}`} hint="out of 100" />
       </div>
-    </div>
+
+      {disputed.length > 0 && (
+        <Link href="/dashboard/disputes">
+          <Card className="mt-3 transition-colors hover:bg-surface">
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-2.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                <span className="text-[14px] text-secondary-foreground">
+                  {disputed.length} agreement{disputed.length > 1 ? 's' : ''} in dispute
+                </span>
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+      )}
+
+      <section className="mt-10">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[15px] font-medium tracking-body">Recent agreements</h2>
+          {agreements.length > 0 && (
+            <Link
+              href="/dashboard/agreements"
+              className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              View all →
+            </Link>
+          )}
+        </div>
+
+        {agreements.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="No agreements yet"
+            description="Describe a deal in plain English and let AI draft the contract, then lock the payment in escrow."
+            action={
+              <Link href="/dashboard/agreements/create">
+                <Button>
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                  Create your first agreement
+                </Button>
+              </Link>
+            }
+          />
+        ) : (
+          <div className="overflow-hidden rounded-lg shadow-hairline">
+            {agreements.slice(0, 5).map((a, i) => (
+              <Link key={a.id} href={`/dashboard/agreements/${a.id}`}>
+                <div
+                  className={`flex items-center justify-between gap-4 bg-card px-4 py-3.5 transition-colors hover:bg-surface ${
+                    i > 0 ? 'border-t border-border' : ''
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <StatusBadge status={a.status} />
+                    <span className="truncate text-[14px] text-secondary-foreground">
+                      {a.title}
+                    </span>
+                  </div>
+                  <span className="shrink-0 font-mono text-[13px] tabular-nums text-muted-foreground">
+                    {Number(a.amountNIM).toFixed(2)} NIM
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
   )
 }

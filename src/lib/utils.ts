@@ -1,5 +1,12 @@
 // Utility functions for NimTrust
 
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
 // Format NIM amount to human-readable string
 export function formatNIM(sats: number | bigint): string {
   const decimals = 5 // NIM has 5 decimal places

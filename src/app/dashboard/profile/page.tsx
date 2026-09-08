@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { shortAddress, formatDate } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input, Textarea } from '@/components/ui/input'
+import { PageHeader, StatTile, PageLoading } from '@/components/ui/page'
 
 interface UserProfile {
   id: string
@@ -20,6 +24,12 @@ interface UserProfile {
   completedCount: number
 }
 
+function scoreTone(score: number) {
+  if (score >= 75) return 'text-success'
+  if (score >= 45) return 'text-accent'
+  return 'text-destructive'
+}
+
 export default function ProfilePage() {
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -27,24 +37,19 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const load = async () => {
       try {
         const sessionRes = await fetch('/api/auth/session', { credentials: 'include' })
-
         if (!sessionRes.ok) {
-          router.push('/login')
+          router.push('/')
           return
         }
-
-        const sessionData = await sessionRes.json()
-        const res = await fetch(`/api/users/${sessionData.user.id}`, {
-          credentials: 'include',
-        })
-
+        const session = await sessionRes.json()
+        const res = await fetch(`/api/users/${session.user.id}`, { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to load profile')
-
         const data = await res.json()
         setProfile(data)
         setDisplayName(data.displayName)
@@ -55,13 +60,12 @@ export default function ProfilePage() {
         setLoading(false)
       }
     }
-
-    loadProfile()
+    load()
   }, [router])
 
-  const handleSaveProfile = async () => {
+  const handleSave = async () => {
     if (!profile) return
-
+    setSaving(true)
     try {
       const res = await fetch(`/api/users/${profile.id}`, {
         method: 'PATCH',
@@ -69,159 +73,135 @@ export default function ProfilePage() {
         body: JSON.stringify({ displayName, bio }),
         credentials: 'include',
       })
-
       if (res.ok) {
         setProfile({ ...profile, displayName, bio })
         setEditing(false)
       }
     } catch (err) {
       console.error('Failed to update profile:', err)
+    } finally {
+      setSaving(false)
     }
   }
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
-  }
+  if (loading) return <PageLoading />
+  if (!profile) return <PageLoading label="Profile not found" />
 
-  if (!profile) {
-    return <div className="flex items-center justify-center min-h-screen">Profile not found</div>
-  }
-
+  const { reputation: rep } = profile
   const completionRate =
-    profile.reputation.totalAgreements > 0
-      ? Math.round((profile.reputation.completedAgreements / profile.reputation.totalAgreements) * 100)
-      : 0
+    rep.totalAgreements > 0 ? Math.round((rep.completedAgreements / rep.totalAgreements) * 100) : 0
+  const score = Math.round(rep.trustScore)
 
   return (
-    <div className="max-w-4xl mx-auto py-8">
-      {/* Header Card */}
-      <div className="bg-gradient-to-r from-accent to-accent/80 text-white p-8 rounded-lg mb-8">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">{profile.displayName}</h1>
-            <p className="text-white/80">{shortAddress(profile.address)}</p>
-            <p className="text-sm text-white/60 mt-2">Joined {formatDate(profile.createdAt)}</p>
-          </div>
-          {!editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded font-semibold text-sm"
-            >
-              Edit Profile
-            </button>
-          )}
-        </div>
-      </div>
+    <>
+      <PageHeader
+        title="Profile"
+        description="Your public identity and reputation on NimTrust."
+        action={
+          !editing && (
+            <Button variant="secondary" onClick={() => setEditing(true)}>
+              Edit profile
+            </Button>
+          )
+        }
+      />
 
-      {/* Trust Score Big Card */}
-      <div className="bg-white p-8 rounded-lg shadow mb-8">
-        <div className="text-center mb-8">
-          <p className="text-muted-foreground mb-2">Trust Score</p>
-          <p className="text-6xl font-bold text-accent">{profile.reputation.trustScore}</p>
-          <p className="text-muted-foreground mt-2">out of 100</p>
-        </div>
+      <Card>
+        <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-[18px] font-medium">
+              {profile.displayName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h2 className="text-[20px] font-medium tracking-heading">{profile.displayName}</h2>
+              <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">
+                {shortAddress(profile.address)}
+              </p>
+              <p className="mt-0.5 text-[12px] text-subtle-foreground">
+                Joined {formatDate(profile.createdAt)}
+              </p>
+            </div>
+          </div>
 
-        <div className="grid grid-cols-4 gap-6">
-          <div className="text-center">
-            <p className="text-2xl font-bold">{profile.reputation.totalAgreements}</p>
-            <p className="text-sm text-muted-foreground">Total Agreements</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold">{completionRate}%</p>
-            <p className="text-sm text-muted-foreground">Completion Rate</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold">{profile.reputation.disputeRate.toFixed(1)}%</p>
-            <p className="text-sm text-muted-foreground">Dispute Rate</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold">{profile.reputation.avgDeliveryDays.toFixed(1)}</p>
-            <p className="text-sm text-muted-foreground">Avg Delivery Days</p>
+          <div className="text-left sm:text-right">
+            <p className="text-[13px] text-muted-foreground">Trust score</p>
+            <p className={`text-[40px] font-medium leading-none tabular-nums ${scoreTone(score)}`}>
+              {score}
+            </p>
+            <div className="mt-2 h-1 w-full min-w-[140px] overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className={`h-full rounded-full ${score >= 75 ? 'bg-success' : score >= 45 ? 'bg-accent' : 'bg-destructive'}`}
+                style={{ width: `${score}%` }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Edit Form */}
       {editing && (
-        <div className="bg-white p-8 rounded-lg shadow mb-8">
-          <h2 className="text-2xl font-bold mb-6">Edit Profile</h2>
-
-          <div className="mb-6">
-            <label className="block mb-2 font-semibold">Display Name</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full border border-border rounded-lg p-3"
-            />
+        <Card className="mt-3">
+          <div className="space-y-4 p-6">
+            <div>
+              <label className="text-[13px] font-medium text-secondary-foreground">
+                Display name
+              </label>
+              <Input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-secondary-foreground">Bio</label>
+              <Textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="What do you do, and what should counterparties know?"
+                rows={4}
+                className="mt-2"
+              />
+            </div>
+            <div className="flex gap-2.5 pt-1">
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving' : 'Save changes'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setEditing(false)
+                  setDisplayName(profile.displayName)
+                  setBio(profile.bio || '')
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-
-          <div className="mb-6">
-            <label className="block mb-2 font-semibold">Bio</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="Tell others about yourself"
-              className="w-full border border-border rounded-lg p-3"
-              rows={4}
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={handleSaveProfile}
-              className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90"
-            >
-              Save Changes
-            </button>
-            <button
-              onClick={() => {
-                setEditing(false)
-                setDisplayName(profile.displayName)
-                setBio(profile.bio || '')
-              }}
-              className="bg-muted text-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        </Card>
       )}
 
-      {/* Bio */}
       {profile.bio && !editing && (
-        <div className="bg-white p-8 rounded-lg shadow mb-8">
-          <h2 className="text-xl font-bold mb-4">About</h2>
-          <p className="text-gray-700">{profile.bio}</p>
-        </div>
+        <Card className="mt-3">
+          <div className="p-6">
+            <p className="mb-2 text-[13px] font-medium text-secondary-foreground">About</p>
+            <p className="text-[14px] leading-relaxed text-muted-foreground">{profile.bio}</p>
+          </div>
+        </Card>
       )}
 
-      {/* Stats */}
-      <div className="bg-white p-8 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-6">Reputation Details</h2>
-
-        <div className="space-y-4">
-          <div className="flex justify-between items-center pb-4 border-b">
-            <span className="text-muted-foreground">Completed Agreements</span>
-            <span className="font-bold text-lg">{profile.reputation.completedAgreements}</span>
-          </div>
-
-          <div className="flex justify-between items-center pb-4 border-b">
-            <span className="text-muted-foreground">Completion Rate</span>
-            <span className="font-bold text-lg">{completionRate}%</span>
-          </div>
-
-          <div className="flex justify-between items-center pb-4 border-b">
-            <span className="text-muted-foreground">Avg Delivery Time</span>
-            <span className="font-bold text-lg">{profile.reputation.avgDeliveryDays.toFixed(1)} days</span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Dispute Rate</span>
-            <span className="font-bold text-lg">{profile.reputation.disputeRate.toFixed(1)}%</span>
-          </div>
+      <div className="mt-8">
+        <h2 className="mb-4 text-[15px] font-medium tracking-body">Reputation</h2>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile label="Agreements" value={rep.totalAgreements} />
+          <StatTile label="Completed" value={rep.completedAgreements} />
+          <StatTile label="Completion rate" value={`${completionRate}%`} />
+          <StatTile
+            label="Dispute rate"
+            value={`${rep.disputeRate.toFixed(1)}%`}
+            hint={`avg ${rep.avgDeliveryDays.toFixed(1)}d delivery`}
+          />
         </div>
       </div>
-    </div>
+    </>
   )
 }

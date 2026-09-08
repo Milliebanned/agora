@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { FileText, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { StatusBadge } from '@/components/ui/badge'
+import { PageHeader, EmptyState, PageLoading } from '@/components/ui/page'
+import { cn } from '@/lib/utils'
 
 interface Agreement {
   id: string
@@ -12,17 +17,11 @@ interface Agreement {
   deadline: string
   buyerId: string
   sellerId: string | null
-  buyer: { displayName: string }
+  buyer?: { displayName: string }
   seller?: { displayName: string }
 }
 
-const statusColors: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-800',
-  active: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  disputed: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-800',
-}
+const FILTERS = ['all', 'draft', 'active', 'completed', 'disputed']
 
 export default function AgreementsPage() {
   const router = useRouter()
@@ -31,108 +30,107 @@ export default function AgreementsPage() {
   const [filter, setFilter] = useState('all')
 
   useEffect(() => {
-    const loadAgreements = async () => {
+    const load = async () => {
+      setLoading(true)
       try {
         const res = await fetch(
-          filter === 'all'
-            ? '/api/agreements'
-            : `/api/agreements?status=${filter}`,
+          filter === 'all' ? '/api/agreements' : `/api/agreements?status=${filter}`,
           { credentials: 'include' },
         )
-
         if (!res.ok) {
-          router.push('/login')
+          router.push('/')
           return
         }
-
-        const data = await res.json()
-        setAgreements(data)
+        setAgreements(await res.json())
       } catch (err) {
         console.error('Failed to load agreements:', err)
       } finally {
         setLoading(false)
       }
     }
-
-    loadAgreements()
+    load()
   }, [filter, router])
 
-  const statusOptions = ['all', 'draft', 'active', 'completed', 'disputed']
-
   return (
-    <div className="max-w-6xl mx-auto py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Agreements</h1>
-        <Link href="/dashboard/agreements/create">
-          <button className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90">
-            Create Agreement
-          </button>
-        </Link>
-      </div>
+    <>
+      <PageHeader
+        title="Agreements"
+        description="Every deal you are party to, funded or otherwise."
+        action={
+          <Link href="/dashboard/agreements/create">
+            <Button>
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              New agreement
+            </Button>
+          </Link>
+        }
+      />
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-6">
-        {statusOptions.map((status) => (
+      <div className="mb-5 flex flex-wrap gap-1.5">
+        {FILTERS.map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+            className={cn(
+              'h-7 rounded-full px-3 text-[13px] transition-colors',
               filter === status
-                ? 'bg-accent text-accent-foreground'
-                : 'bg-muted text-foreground hover:bg-gray-200'
-            }`}
+                ? 'bg-white/[0.10] text-foreground'
+                : 'bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-secondary-foreground',
+            )}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
           </button>
         ))}
       </div>
 
-      {/* List */}
       {loading ? (
-        <p className="text-muted-foreground">Loading...</p>
+        <PageLoading />
       ) : agreements.length === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="text-muted-foreground mb-4">No agreements yet</p>
-          <Link href="/dashboard/agreements/create">
-            <button className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90">
-              Create Your First Agreement
-            </button>
-          </Link>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title={filter === 'all' ? 'No agreements yet' : `No ${filter} agreements`}
+          description={
+            filter === 'all'
+              ? 'Describe a deal in plain English and let AI draft the contract.'
+              : 'Try a different filter, or create a new agreement.'
+          }
+          action={
+            <Link href="/dashboard/agreements/create">
+              <Button>
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                Create agreement
+              </Button>
+            </Link>
+          }
+        />
       ) : (
-        <div className="space-y-4">
-          {agreements.map((agreement) => (
-            <Link key={agreement.id} href={`/dashboard/agreements/${agreement.id}`}>
-              <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold">{agreement.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {agreement.buyerId !== agreement.sellerId
-                        ? agreement.sellerId
-                          ? `with ${agreement.seller?.displayName || 'Pending'}`
-                          : 'Awaiting seller'
-                        : 'Self-signed'}
+        <div className="overflow-hidden rounded-lg shadow-hairline">
+          {agreements.map((a, i) => (
+            <Link key={a.id} href={`/dashboard/agreements/${a.id}`}>
+              <div
+                className={cn(
+                  'bg-card px-4 py-4 transition-colors hover:bg-surface',
+                  i > 0 && 'border-t border-border',
+                )}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5">
+                      <StatusBadge status={a.status} />
+                      <span className="truncate text-[15px] font-medium tracking-body">
+                        {a.title}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-[13px] text-muted-foreground">
+                      {a.sellerId ? `with ${a.seller?.displayName ?? 'counterparty'}` : 'Awaiting seller'}
                     </p>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      statusColors[agreement.status]
-                    }`}
-                  >
-                    {agreement.status.charAt(0).toUpperCase() + agreement.status.slice(1)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Amount</p>
-                    <p className="text-xl font-bold">{agreement.amountNIM} NIM</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Deadline</p>
-                    <p className="text-sm font-semibold">
-                      {new Date(agreement.deadline).toLocaleDateString()}
+                  <div className="shrink-0 text-right">
+                    <p className="font-mono text-[14px] tabular-nums text-foreground">
+                      {Number(a.amountNIM).toFixed(2)} NIM
+                    </p>
+                    <p className="mt-1 text-[12px] text-subtle-foreground">
+                      due {new Date(a.deadline).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -141,6 +139,6 @@ export default function AgreementsPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   )
 }
