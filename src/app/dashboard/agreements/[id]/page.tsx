@@ -21,6 +21,7 @@ interface Agreement {
     id: string
     title: string
     status: string
+    deliverable?: string
     createdAt: string
     submittedAt?: string
     approvedAt?: string
@@ -57,6 +58,11 @@ export default function AgreementDetailPage() {
   const [error, setError] = useState('')
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [fundingLoading, setFundingLoading] = useState(false)
+  const [newMessage, setNewMessage] = useState('')
+  const [messageSending, setMessageSending] = useState(false)
+  const [showDisputeForm, setShowDisputeForm] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+  const [openingDispute, setOpeningDispute] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -71,7 +77,6 @@ export default function AgreementDetailPage() {
         const data = await res.json()
         setAgreement(data)
 
-        // Get current user ID from session
         const sessionRes = await fetch('/api/auth/session', { credentials: 'include' })
         if (sessionRes.ok) {
           const sessionData = await sessionRes.json()
@@ -93,7 +98,6 @@ export default function AgreementDetailPage() {
     setError('')
 
     try {
-      // Step 1: Prepare HTLC funding on server
       const res = await fetch(`/api/agreements/${agreementId}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,25 +111,99 @@ export default function AgreementDetailPage() {
       }
 
       const { htlcData } = await res.json()
+      alert('✅ Escrow prepared!\n\nIn real Nimiq Pay, sign the HTLC transaction now.\n\n' +
+        `Hash Root: ${htlcData.hash_root?.substring(0, 16)}...`)
 
-      // Step 2: (In real implementation) Sign and send HTLC creation transaction via Nimiq Pay
-      // This would call the Nimiq SDK's transaction signing method
-      // For now, just show success and refresh
-      alert(
-        'Escrow prepared! In real Nimiq Pay, you would sign the HTLC creation transaction now.\n\nHTLC Data:\n' +
-          JSON.stringify(htlcData, null, 2),
-      )
-
-      // Refresh agreement to show updated state
       const refreshRes = await fetch(`/api/agreements/${agreementId}`, { credentials: 'include' })
       if (refreshRes.ok) {
-        const updated = await refreshRes.json()
-        setAgreement(updated)
+        setAgreement(await refreshRes.json())
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setFundingLoading(false)
+    }
+  }
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newMessage.trim()) return
+
+    setMessageSending(true)
+
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agreementId, content: newMessage }),
+        credentials: 'include',
+      })
+
+      if (res.ok) {
+        const msg = await res.json()
+        if (agreement) {
+          setAgreement({
+            ...agreement,
+            messages: [...agreement.messages, msg],
+          })
+        }
+        setNewMessage('')
+      }
+    } catch (err) {
+      setError('Failed to send message')
+    } finally {
+      setMessageSending(false)
+    }
+  }
+
+  const handleOpenDispute = async () => {
+    if (!disputeReason.trim()) {
+      setError('Please enter a reason for the dispute')
+      return
+    }
+
+    setOpeningDispute(true)
+
+    try {
+      const res = await fetch('/api/disputes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agreementId, reason: disputeReason }),
+        credentials: 'include',
+      })
+
+      if (res.ok) {
+        alert('✅ Dispute opened. AI Mediator will review.')
+        router.push('/dashboard/disputes')
+      } else {
+        throw new Error('Failed to open dispute')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open dispute')
+    } finally {
+      setOpeningDispute(false)
+      setShowDisputeForm(false)
+    }
+  }
+
+  const handleApproveMilestone = async (milestoneId: string) => {
+    try {
+      const res = await fetch(`/api/agreements/${agreementId}/milestones`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestoneId, status: 'approved' }),
+        credentials: 'include',
+      })
+
+      if (res.ok) {
+        alert('✅ Milestone approved! Funds will be released.')
+        const refreshRes = await fetch(`/api/agreements/${agreementId}`, { credentials: 'include' })
+        if (refreshRes.ok) {
+          setAgreement(await refreshRes.json())
+        }
+      }
+    } catch (err) {
+      setError('Failed to approve milestone')
     }
   }
 
@@ -142,19 +220,15 @@ export default function AgreementDetailPage() {
   const riskFlags = parseJsonArray(agreement.riskFlags)
 
   return (
-    <div className="max-w-6xl mx-auto py-8">
+    <div className="max-w-6xl mx-auto py-8 px-4">
       {/* Header */}
       <div className="bg-white p-8 rounded-lg shadow mb-6">
         <div className="flex justify-between items-start mb-6">
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold">{agreement.title}</h1>
             <p className="text-muted-foreground mt-2">{agreement.description}</p>
           </div>
-          <span
-            className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-              statusColors[agreement.status]
-            }`}
-          >
+          <span className={`px-4 py-2 rounded-lg text-sm font-semibold ${statusColors[agreement.status]}`}>
             {agreement.status.toUpperCase()}
           </span>
         </div>
@@ -171,14 +245,10 @@ export default function AgreementDetailPage() {
           <div>
             <p className="text-muted-foreground text-sm">Buyer</p>
             <p className="text-sm font-semibold">{agreement.buyer.displayName}</p>
-            <p className="text-xs text-muted-foreground">{shortAddress(agreement.buyer.address)}</p>
           </div>
           <div>
             <p className="text-muted-foreground text-sm">Seller</p>
             <p className="text-sm font-semibold">{agreement.seller?.displayName || 'Pending'}</p>
-            {agreement.seller && (
-              <p className="text-xs text-muted-foreground">{shortAddress(agreement.seller.address)}</p>
-            )}
           </div>
         </div>
       </div>
@@ -190,26 +260,17 @@ export default function AgreementDetailPage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-xl font-bold mb-4">💰 Escrow Status</h2>
             {agreement.htlcAddress ? (
-              <div className="space-y-2">
-                <p className="text-sm">
-                  <span className="font-semibold">Status:</span> Funded
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">HTLC Address:</span>{' '}
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                    {shortAddress(agreement.htlcAddress, 10)}
-                  </code>
-                </p>
+              <div className="space-y-3">
+                <div className="bg-green-50 border border-green-200 p-4 rounded">
+                  <p className="text-green-800 font-semibold">✅ Funded</p>
+                </div>
                 {agreement.escrowTransactions.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold mb-2">Transaction History:</p>
+                  <div>
+                    <p className="text-sm font-semibold mb-2">Transactions:</p>
                     <div className="space-y-2">
                       {agreement.escrowTransactions.map((tx, i) => (
                         <div key={i} className="text-xs bg-gray-50 p-2 rounded">
-                          <p>
-                            <span className="font-semibold capitalize">{tx.type}:</span>{' '}
-                            {tx.status.toUpperCase()}
-                          </p>
+                          <p className="font-semibold capitalize">{tx.type}: {tx.status}</p>
                           <p className="text-muted-foreground">{formatDate(tx.createdAt)}</p>
                         </div>
                       ))}
@@ -218,16 +279,13 @@ export default function AgreementDetailPage() {
                 )}
               </div>
             ) : isBuyer ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-4">Escrow not yet funded.</p>
-                <button
-                  onClick={handleFundEscrow}
-                  disabled={fundingLoading}
-                  className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90 disabled:opacity-50"
-                >
-                  {fundingLoading ? 'Funding...' : 'Fund Escrow (HTLC)'}
-                </button>
-              </div>
+              <button
+                onClick={handleFundEscrow}
+                disabled={fundingLoading}
+                className="bg-accent text-accent-foreground px-6 py-2 rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 w-full"
+              >
+                {fundingLoading ? '⏳ Preparing...' : '🔒 Fund Escrow (HTLC)'}
+              </button>
             ) : (
               <p className="text-sm text-muted-foreground">Awaiting buyer to fund escrow...</p>
             )}
@@ -237,36 +295,34 @@ export default function AgreementDetailPage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-xl font-bold mb-4">📋 Milestones</h2>
             {agreement.milestones.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No milestones yet.</p>
+              <p className="text-sm text-muted-foreground">No milestones created yet</p>
             ) : (
               <div className="space-y-3">
-                {agreement.milestones.map((milestone) => (
-                  <div key={milestone.id} className="border border-border p-4 rounded">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold">{milestone.title}</h3>
+                {agreement.milestones.map((ms) => (
+                  <div key={ms.id} className="border border-border p-4 rounded">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold">{ms.title}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Created: {formatDate(ms.createdAt)}</p>
+                      </div>
                       <span
                         className={`text-xs font-semibold px-2 py-1 rounded ${
-                          milestone.status === 'approved'
+                          ms.status === 'approved'
                             ? 'bg-green-100 text-green-800'
-                            : milestone.status === 'submitted'
+                            : ms.status === 'submitted'
                               ? 'bg-blue-100 text-blue-800'
                               : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {milestone.status.toUpperCase()}
+                        {ms.status.toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Created: {formatDate(milestone.createdAt)}
-                    </p>
-                    {isSeller && milestone.status === 'pending' && (
-                      <button className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded hover:bg-blue-200">
-                        Submit Work
-                      </button>
-                    )}
-                    {isBuyer && milestone.status === 'submitted' && (
-                      <button className="text-sm bg-green-100 text-green-800 px-3 py-1 rounded hover:bg-green-200">
-                        Approve
+                    {isBuyer && ms.status === 'submitted' && (
+                      <button
+                        onClick={() => handleApproveMilestone(ms.id)}
+                        className="text-sm bg-green-100 text-green-800 px-3 py-1 rounded hover:bg-green-200 font-semibold"
+                      >
+                        ✓ Approve
                       </button>
                     )}
                   </div>
@@ -278,16 +334,54 @@ export default function AgreementDetailPage() {
           {/* Risk Flags */}
           {riskFlags.length > 0 && (
             <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
-              <h2 className="text-xl font-bold mb-4">⚠️ Risk Flags</h2>
-              <ul className="space-y-2">
+              <h2 className="text-lg font-bold mb-3">⚠️ Risk Flags</h2>
+              <ul className="space-y-1">
                 {riskFlags.map((flag, i) => (
-                  <li key={i} className="text-sm">
-                    • {flag}
-                  </li>
+                  <li key={i} className="text-sm">• {flag}</li>
                 ))}
               </ul>
             </div>
           )}
+
+          {/* Messages */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h2 className="text-xl font-bold mb-4">💬 Messages</h2>
+            <div className="bg-gray-50 p-4 rounded mb-4 max-h-64 overflow-y-auto min-h-32">
+              {agreement.messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No messages yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {agreement.messages.slice(-10).map((msg) => (
+                    <div key={msg.id} className="text-sm">
+                      <p className="font-semibold text-xs text-muted-foreground">
+                        {msg.type === 'system' ? '🔔 System' : msg.sender?.displayName || 'Unknown'}
+                      </p>
+                      <p className="text-gray-700">{msg.content}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{formatDate(msg.createdAt)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Send a message..."
+                className="flex-1 border border-border rounded p-2 text-sm"
+                disabled={messageSending}
+              />
+              <button
+                type="submit"
+                disabled={messageSending || !newMessage.trim()}
+                className="bg-blue-600 text-white px-4 py-2 rounded font-semibold text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                Send
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -296,36 +390,70 @@ export default function AgreementDetailPage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="font-bold mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <button className="w-full bg-blue-100 text-blue-800 px-4 py-2 rounded font-semibold text-sm hover:bg-blue-200">
-                💬 Message
-              </button>
-              <button className="w-full bg-red-100 text-red-800 px-4 py-2 rounded font-semibold text-sm hover:bg-red-200">
-                ⚠️ Dispute
-              </button>
+              {!showDisputeForm ? (
+                <>
+                  <button
+                    onClick={() => setShowDisputeForm(true)}
+                    className="w-full bg-red-100 text-red-800 px-4 py-2 rounded font-semibold text-sm hover:bg-red-200"
+                  >
+                    ⚠️ Open Dispute
+                  </button>
+                  <button className="w-full bg-gray-100 text-gray-800 px-4 py-2 rounded font-semibold text-sm hover:bg-gray-200">
+                    📞 Contact Support
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-3 bg-red-50 p-4 rounded border border-red-200">
+                  <p className="text-sm font-semibold">Why are you opening a dispute?</p>
+                  <textarea
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                    className="w-full border border-border rounded p-2 text-sm"
+                    rows={3}
+                    placeholder="Explain the issue..."
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleOpenDispute}
+                      disabled={openingDispute}
+                      className="flex-1 bg-red-600 text-white px-3 py-2 rounded font-semibold text-sm hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {openingDispute ? 'Opening...' : 'Open Dispute'}
+                    </button>
+                    <button
+                      onClick={() => setShowDisputeForm(false)}
+                      className="flex-1 bg-gray-300 text-gray-800 px-3 py-2 rounded font-semibold text-sm hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* Status Info */}
           <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="font-bold mb-4">Recent Activity</h3>
-            {agreement.messages.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No activity yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {agreement.messages.slice(0, 5).map((msg) => (
-                  <div key={msg.id} className="text-xs border-l-2 border-border pl-2 py-1">
-                    <p className="font-semibold">{msg.type === 'system' ? '🔔 System' : msg.sender?.displayName}</p>
-                    <p className="text-muted-foreground truncate">{msg.content}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(msg.createdAt)}</p>
-                  </div>
-                ))}
+            <h3 className="font-bold mb-4">Status</h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Created</p>
+                <p className="font-semibold">{formatDate(agreement.createdAt)}</p>
               </div>
-            )}
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                <p className="font-semibold capitalize">{agreement.status}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {error && <div className="mt-6 bg-red-50 border border-red-200 text-red-800 p-4 rounded">{error}</div>}
+      {error && (
+        <div className="mt-6 bg-red-50 border border-red-200 text-red-800 p-4 rounded">
+          {error}
+        </div>
+      )}
     </div>
   )
 }
