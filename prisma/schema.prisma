@@ -1,0 +1,152 @@
+// Prisma ORM Schema for NimTrust
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User (wallet-based auth, no passwords)
+model User {
+  id                String   @id @default(cuid())
+  address           String   @unique // Nimiq wallet address
+  displayName       String?
+  bio               String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  sentAgreements    Agreement[] @relation("Buyer")
+  receivedAgreements Agreement[] @relation("Seller")
+  sentMessages      Message[]
+  openedDisputes    Dispute[]   @relation("Opener")
+  receivedDisputes  Dispute[]   @relation("Respondent")
+  reputationScores  ReputationScore?
+}
+
+// Agreement (contract)
+model Agreement {
+  id                String   @id @default(cuid())
+  title             String
+  description       String   @db.Text
+  status            String   @default("draft") // draft, active, completed, disputed, cancelled
+
+  // Parties
+  buyerId           String
+  buyer             User     @relation("Buyer", fields: [buyerId], references: [id])
+  sellerId          String?
+  seller            User?    @relation("Seller", fields: [sellerId], references: [id])
+
+  // Terms
+  amountNIM         Decimal  // Escrow amount in NIM
+  deadline          DateTime
+  deliverables      String   @db.Text // JSON array of strings
+  completionTerms   String   @db.Text
+  refundTerms       String   @db.Text
+
+  // HTLC Escrow
+  htlcAddress       String?  // Nimiq HTLC contract address (on-chain)
+  htlcHashRoot      String?  // Hash of the release secret
+  htlcPreImage      String?  // Release secret (revealed on approval)
+  htlcTimeout       Int?     // Block height expiration
+
+  // Risk Assessment (AI-generated)
+  riskFlags         String   @db.Text // JSON array of risk warnings
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  milestones        Milestone[]
+  escrowTransactions EscrowTransaction[]
+  messages          Message[]
+  disputes          Dispute[]
+}
+
+// Milestone (deliverable checkpoint)
+model Milestone {
+  id                String   @id @default(cuid())
+  agreementId       String
+  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  title             String
+  description       String   @db.Text
+  status            String   @default("pending") // pending, submitted, approved, rejected
+  deliverable       String   @db.Text // Work submitted by seller
+
+  createdAt         DateTime @default(now())
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+}
+
+// Escrow Transaction (HTLC fund/claim/refund events)
+model EscrowTransaction {
+  id                String   @id @default(cuid())
+  agreementId       String
+  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  type              String   // "fund", "claim", "refund"
+  status            String   @default("pending") // pending, confirmed, failed
+  txHash            String?  // On-chain Nimiq transaction hash
+
+  createdAt         DateTime @default(now())
+  confirmedAt       DateTime?
+}
+
+// Message (agreement chat)
+model Message {
+  id                String   @id @default(cuid())
+  agreementId       String
+  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  senderId          String
+  sender            User     @relation(fields: [senderId], references: [id])
+
+  type              String   @default("text") // text, system
+  content           String   @db.Text
+
+  createdAt         DateTime @default(now())
+}
+
+// Dispute (conflict resolution)
+model Dispute {
+  id                String   @id @default(cuid())
+  agreementId       String
+  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  openerId          String
+  opener            User     @relation("Opener", fields: [openerId], references: [id])
+  respondentId      String
+  respondent        User     @relation("Respondent", fields: [respondentId], references: [id])
+
+  reason            String
+  status            String   @default("open") // open, under_review, resolved
+
+  // AI Mediator Verdict
+  caseSummary       String   @db.Text?
+  findings          String   @db.Text?
+  recommendedOutcome String? // "release", "refund", "partial_refund", "escalate"
+
+  createdAt         DateTime @default(now())
+  resolvedAt        DateTime?
+}
+
+// Reputation / Trust Score
+model ReputationScore {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalAgreements   Int      @default(0)
+  completedAgreements Int    @default(0)
+  avgDeliveryDays   Decimal  @default(0)
+  disputeRate       Decimal  @default(0) // percentage
+
+  trustScore        Int      @default(0) // 0-100
+
+  updatedAt         DateTime @updatedAt
+}
