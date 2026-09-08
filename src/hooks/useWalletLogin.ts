@@ -51,7 +51,8 @@ export function useWalletLogin() {
       })
 
       if (!verifyRes.ok) {
-        setError('Authentication failed. Please try again.')
+        const detail = await verifyRes.text().catch(() => '')
+        setError(`Authentication failed (${verifyRes.status}). ${detail.slice(0, 300)}`)
         setLoading(false)
         return
       }
