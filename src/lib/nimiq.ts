@@ -67,7 +67,10 @@ export async function getAccounts(): Promise<string[]> {
       console.error('listAccounts failed:', result.error.message)
       return []
     }
-    return result as string[]
+    // Types say string[], but tolerate [{ address }] shapes from the wallet.
+    return (result as unknown[]).map((entry) =>
+      typeof entry === 'string' ? entry : String((entry as { address?: string })?.address ?? entry),
+    )
   } catch (err) {
     console.error('Failed to list accounts:', err)
     return []
@@ -225,7 +228,17 @@ export async function signMessage(
       console.error('sign failed:', result.error.message)
       return null
     }
-    return result as { publicKey: string; signature: string }
+    console.info('sign() returned:', JSON.stringify(result))
+    // Types say { publicKey, signature }; some builds hand back a bare
+    // signature string, so accept either.
+    if (typeof result === 'string') {
+      return { publicKey: '', signature: result }
+    }
+    const signed = result as { publicKey?: string; signature?: string; sig?: string }
+    return {
+      publicKey: signed.publicKey ?? '',
+      signature: signed.signature ?? signed.sig ?? '',
+    }
   } catch (err) {
     console.error('Failed to sign message:', err)
     return null
