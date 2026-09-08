@@ -17,22 +17,41 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const res = await fetch('/api/auth/session', { credentials: 'include' })
-      if (!res.ok) {
-        router.push('/login')
-      }
-    }
-
     const loadDashboard = async () => {
       try {
-        // TODO: Fetch actual dashboard data from API
+        const sessionRes = await fetch('/api/auth/session', { credentials: 'include' })
+        if (!sessionRes.ok) {
+          router.push('/login')
+          return
+        }
+
+        const sessionData = await sessionRes.json()
+
+        // Fetch agreements
+        const agreementsRes = await fetch('/api/agreements', { credentials: 'include' })
+        const agreements = agreementsRes.ok ? await agreementsRes.json() : []
+
+        // Fetch user profile with reputation
+        const profileRes = await fetch(`/api/users/${sessionData.user.id}`, {
+          credentials: 'include',
+        })
+        const profile = profileRes.ok ? await profileRes.json() : null
+
+        const activeCount = agreements.filter((a: any) => a.status === 'active').length
+        const pendingCount = agreements.filter((a: any) => a.status === 'draft').length
+        const disputedCount = agreements.filter((a: any) => a.status === 'disputed').length
+
+        // Calculate escrow balance (total locked in active agreements)
+        const escrowBalance = agreements
+          .filter((a: any) => a.status === 'active' && a.htlcAddress)
+          .reduce((sum: number, a: any) => sum + a.amountNIM, 0)
+
         setData({
-          activeCount: 2,
-          pendingCount: 1,
-          disputedCount: 0,
-          escrowBalance: 1250.5,
-          trustScore: 92,
+          activeCount,
+          pendingCount,
+          disputedCount,
+          escrowBalance,
+          trustScore: profile?.reputation?.trustScore || 50,
         })
       } catch (err) {
         console.error('Failed to load dashboard:', err)
@@ -41,7 +60,6 @@ export default function DashboardPage() {
       }
     }
 
-    checkAuth()
     loadDashboard()
   }, [router])
 
