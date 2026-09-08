@@ -93,7 +93,7 @@ export default function AgreementDetailPage() {
     setError('')
 
     try {
-      // Call HTLC creation endpoint (will be implemented in Day 2)
+      // Step 1: Prepare HTLC funding on server
       const res = await fetch(`/api/agreements/${agreementId}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,10 +102,21 @@ export default function AgreementDetailPage() {
       })
 
       if (!res.ok) {
-        throw new Error('Failed to fund escrow')
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to prepare escrow')
       }
 
-      // Refresh agreement
+      const { htlcData } = await res.json()
+
+      // Step 2: (In real implementation) Sign and send HTLC creation transaction via Nimiq Pay
+      // This would call the Nimiq SDK's transaction signing method
+      // For now, just show success and refresh
+      alert(
+        'Escrow prepared! In real Nimiq Pay, you would sign the HTLC creation transaction now.\n\nHTLC Data:\n' +
+          JSON.stringify(htlcData, null, 2),
+      )
+
+      // Refresh agreement to show updated state
       const refreshRes = await fetch(`/api/agreements/${agreementId}`, { credentials: 'include' })
       if (refreshRes.ok) {
         const updated = await refreshRes.json()
