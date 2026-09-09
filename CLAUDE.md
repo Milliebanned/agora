@@ -8,7 +8,7 @@
 - **Database:** Supabase Postgres + Prisma ORM (Realtime for messaging)
 - **Auth:** Wallet-based (message signing, no passwords)
 - **Blockchain:** `@nimiq/mini-app-sdk` (wallet/signing) + `@nimiq/core` (HTLC transactions)
-- **AI:** Claude Sonnet 5 (agreement generation, mediation) + Haiku 4.5 (chat, quick flags)
+- **AI:** Google Gemini — 3.8 Flash (agreement generation, mediation) + 3.5 Flash-Lite (chat, quick flags)
 - **Hosting:** Vercel (frontend) + Supabase (backend)
 
 ## Nimiq Mini App Basics
@@ -29,23 +29,23 @@ Nimiq natively supports Hashed Time-Locked Contracts (not a custom smart contrac
 
 **Known Gap:** exact SDK method for signing contract-creation transactions not confirmed in docs. **Day 1 spike required.**
 
-## Claude API Patterns
+## Gemini API Patterns
 
-- **Sonnet 5** (expensive, reasoning-heavy): agreement generation (user request → structured contract), risk analysis, dispute mediation (review agreement + timeline + messages → verdict).
-- **Haiku 4.5** (cheap, fast): AI Assistant chat, quick risk-flag checks.
+- **Gemini 3.8 Flash** (reasoning-heavy): agreement generation (user request → structured contract), dispute mediation (review agreement + timeline + messages → verdict).
+- **Gemini 3.5 Flash-Lite** (cheap, fast): AI Assistant chat, quick risk-flag checks.
 
-Use structured output via tool use / JSON schema for agreement & mediation.
+Use structured output via `response_format: { type: 'text', mime_type: 'application/json', schema }` for agreement & mediation — the schema is enforced server-side, so no prompt-level "return valid JSON" pleading.
 
 ## Scope (Deep MVP — No Breadth)
 
 **Built end-to-end:**
 1. Wallet login (message signing) → profile auto-create.
-2. AI Agreement Builder (user text → Sonnet generates full contract).
+2. AI Agreement Builder (user text → Gemini generates full contract).
 3. Fund escrow (HTLC creation tx).
 4. Seller joins, submits milestone.
 5. Buyer approves milestone → funds release.
 6. Reputation update (trust score, completion rate).
-7. Dispute + AI Mediator (Sonnet reviews → verdict).
+7. Dispute + AI Mediator (Gemini reviews → verdict).
 8. Minimal messaging (text only, system events).
 9. Trimmed dashboard (active/pending/disputed counts, escrow balance, trust score, one AI insight) + sidebar nav.
 
@@ -70,12 +70,12 @@ Use structured output via tool use / JSON schema for agreement & mediation.
 
 ✅ Wallet login (message signing, no passwords)  
 ✅ Role onboarding (offer a service vs. require a service, switchable in profile)  
-✅ AI Agreement Builder (Claude Sonnet generates contracts)  
+✅ AI Agreement Builder (Gemini generates contracts)  
 ✅ Agreement CRUD (create, read, update, filter by status)  
 ✅ Milestone management (create, submit, approve)  
 ✅ HTLC Escrow (fund preparation + claim path)  
 ✅ Reputation System (trust scores, completion rates)  
-✅ AI Dispute Mediator (Sonnet reviews + verdict)  
+✅ AI Dispute Mediator (Gemini reviews + verdict)  
 ✅ Text Messaging (per-agreement chat + system events)  
 ✅ Dashboard (real-time stats + quick actions)  
 ✅ User Profiles (trust score, bio, edit)  
@@ -88,7 +88,7 @@ Use structured output via tool use / JSON schema for agreement & mediation.
 1. Install Node.js 18+ (`brew install node` or [nodejs.org](https://nodejs.org)).
 2. `npm install` from `/Users/Apple/nimtrust`
 3. Create Supabase project (free tier).
-4. Populate `.env.local`: `ANTHROPIC_API_KEY`, Supabase URL, Nimiq network (testnet), JWT secret.
+4. Populate `.env.local`: `GEMINI_API_KEY`, Supabase URL, Nimiq network (testnet), JWT secret.
 5. `npx prisma migrate dev --name init`
 6. `npm run dev` (localhost:3000)
 7. **Start building immediately** — follow Day 1 focus above.
@@ -108,12 +108,12 @@ src/
 │   └── api/
 │       ├── auth/               # challenge, verify (JWT)
 │       ├── agreements/         # CRUD + fund, claim routes
-│       ├── ai/                 # generate-agreement (Sonnet), chat (Haiku)
+│       ├── ai/                 # generate-agreement, chat (Gemini)
 │       ├── disputes/           # CRUD + resolve (mediator)
 │       └── messages/           # Text only
 ├── lib/
 │   ├── nimiq.ts               # SDK init, HTLC building, block queries
-│   ├── claude.ts              # Sonnet/Haiku clients
+│   ├── gemini.ts              # Gemini client (reasoning + fast tiers)
 │   ├── db.ts                  # Prisma singleton
 │   ├── auth.ts                # JWT validation
 │   └── types.ts               # Shared interfaces

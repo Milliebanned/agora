@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateAgreement, checkRiskFlags } from '@/lib/claude'
+import { generateAgreement, checkRiskFlags, isGeminiConfigured } from '@/lib/gemini'
 import { verifySessionToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing userRequest' }, { status: 400 })
     }
 
-    // Generate agreement using Claude Sonnet
+    // Generate agreement using Gemini
     const agreement = await generateAgreement(userRequest)
     if (!agreement) {
       return NextResponse.json({ error: 'Failed to generate agreement' }, { status: 500 })
@@ -46,10 +46,9 @@ Refund: ${agreement.refund_conditions}
   } catch (error) {
     console.error('Agreement generation error:', error)
     const detail = error instanceof Error ? error.message : String(error)
-    const missingKey = !process.env.ANTHROPIC_API_KEY
     return NextResponse.json(
       {
-        error: missingKey ? 'ANTHROPIC_API_KEY is not set' : 'Agreement generation failed',
+        error: isGeminiConfigured() ? 'Agreement generation failed' : 'GEMINI_API_KEY is not set',
         detail,
       },
       { status: 500 },

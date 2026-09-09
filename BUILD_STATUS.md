@@ -18,7 +18,7 @@
 - ✅ `lib/types.ts` — TypeScript interfaces for all entities
 - ✅ `lib/db.ts` — Prisma client singleton
 - ✅ `lib/nimiq.ts` — Nimiq SDK integration (includes Day 1 spike placeholders)
-- ✅ `lib/claude.ts` — Claude API clients (Sonnet + Haiku)
+- ✅ `lib/gemini.ts` — Gemini API client (reasoning + fast tiers)
 - ✅ `lib/auth.ts` — JWT session + wallet challenge signing
 - ✅ `lib/utils.ts` — Helper functions (NIM formatting, address shortening, trust score calculation, etc.)
 
@@ -140,7 +140,7 @@ export async function signAndSendTransaction(txData: any) {
 
 ### Key Files to Read First
 
-1. `CLAUDE.md` — understand the architecture & Claude API split (Sonnet vs Haiku)
+1. `CLAUDE.md` — understand the architecture & Gemini model split (3.8 Flash vs 3.5 Flash-Lite)
 2. `SETUP_INSTRUCTIONS.md` — complete the setup
 3. `prisma/schema.prisma` — understand the data model
 4. `src/lib/types.ts` — TypeScript interfaces (shared across all endpoints)
@@ -154,8 +154,8 @@ export async function signAndSendTransaction(txData: any) {
 - Supabase provides Realtime for messaging + Storage for files (built-in, no extra infrastructure)
 
 ### AI Integration Strategy
-- **Sonnet 5** (expensive, reasoning-heavy): agreement generation, dispute mediation, risk analysis
-- **Haiku 4.5** (cheap, fast): AI assistant chat, quick risk-flag checks
+- **Gemini 3.8 Flash** (reasoning-heavy): agreement generation, dispute mediation
+- **Gemini 3.5 Flash-Lite** (cheap, fast): AI assistant chat, quick risk-flag checks
 - **Structured output via tool use/JSON schema** for reliable parsing
 
 ### Blockchain Integration
@@ -201,7 +201,7 @@ git push -u origin main
 
 - **Competition:** https://miniappscompetition.com
 - **Nimiq Docs:** https://nimiq.dev/mini-apps
-- **Claude API:** https://docs.anthropic.com
+- **Gemini API:** https://ai.google.dev/gemini-api/docs
 - **Supabase:** https://supabase.com/docs
 - **Next.js:** https://nextjs.org
 - **Prisma:** https://www.prisma.io/docs

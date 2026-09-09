@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySessionToken } from '@/lib/auth'
 import prisma from '@/lib/db'
-import { generateAgreement } from '@/lib/claude'
+import { generateAgreement } from '@/lib/gemini'
 import { sha256, randomHex, parseJsonArray } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
