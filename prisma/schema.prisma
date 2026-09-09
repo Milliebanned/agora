@@ -29,14 +29,34 @@ model User {
   openedDisputes    Dispute[]   @relation("Opener")
   receivedDisputes  Dispute[]   @relation("Respondent")
   reputationScores  ReputationScore?
+  proposals         Proposal[]  @relation("Freelancer")
 }
 
-// Agreement (contract)
+// Agreement — a marketplace opportunity across its whole life.
+//
+// One row carries the posting, the escrow, and the engagement, so the chat,
+// milestones, escrow transactions and disputes that already hang off it stay
+// attached when a posting turns into a contract. Lifecycle:
+//
+//   draft     posted by the client, budget not yet committed
+//   open      escrow committed, listed on the public board, taking proposals
+//   locked    a proposal was accepted, HTLC created, work under way
+//   submitted freelancer handed in the work, awaiting the client's review
+//   completed client approved, escrow released to the freelancer
+//   disputed  either party escalated to the AI mediator
+//   cancelled withdrawn before a freelancer was accepted
 model Agreement {
   id                String   @id @default(cuid())
   title             String
   description       String   @db.Text
-  status            String   @default("draft") // draft, active, completed, disputed, cancelled
+  status            String   @default("draft")
+
+  // Structured posting fields (replaces the AI-drafted agreement flow)
+  category          String?  // see CATEGORIES in src/lib/opportunities.ts
+  serviceType       String?  // the specific service within the category
+  timelineDays      Int?     // working days the client is asking for
+  budgetNIM         Decimal? // budget as posted; amountNIM narrows to the accepted bid
+  attachments       String   @default("[]") @db.Text // JSON array of { label, url }
 
   // Parties
   buyerId           String
@@ -45,7 +65,7 @@ model Agreement {
   seller            User?    @relation("Seller", fields: [sellerId], references: [id])
 
   // Terms
-  amountNIM         Decimal  // Escrow amount in NIM
+  amountNIM         Decimal  // Escrow amount in NIM (== budgetNIM until a bid is accepted)
   deadline          DateTime
   deliverables      String   @db.Text // JSON array of strings
   completionTerms   String   @db.Text
@@ -57,18 +77,57 @@ model Agreement {
   htlcPreImage      String?  // Release secret (revealed on approval)
   htlcTimeout       Int?     // Block height expiration
 
+  // Work handed in by the freelancer, reviewed by the client and, if it comes
+  // to that, by the AI mediator against the deliverables above.
+  workSubmission    String?  @db.Text
+
   // Risk Assessment (AI-generated)
   riskFlags         String   @db.Text // JSON array of risk warnings
 
   // Timestamps
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  publishedAt       DateTime? // escrow committed, listed on the board
+  lockedAt          DateTime? // proposal accepted, HTLC created
+  workSubmittedAt   DateTime?
+  completedAt       DateTime?
 
   // Relations
+  proposals         Proposal[]
   milestones        Milestone[]
   escrowTransactions EscrowTransaction[]
   messages          Message[]
   disputes          Dispute[]
+
+  // The board reads open postings newest-first; the profile reads by party.
+  @@index([status, publishedAt])
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+// Proposal — a freelancer's pitch for an open opportunity.
+//
+// Proposals are the only contact before selection: the private chat opens once
+// one is accepted, which is also the moment the HTLC is created on-chain.
+model Proposal {
+  id                String   @id @default(cuid())
+  agreementId       String
+  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  freelancerId      String
+  freelancer        User     @relation("Freelancer", fields: [freelancerId], references: [id])
+
+  coverLetter       String   @db.Text
+  bidNIM            Decimal  // never above the posted budget — the escrow is already committed
+  deliveryDays      Int
+  status            String   @default("pending") // pending, accepted, rejected, withdrawn
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // One pitch per freelancer per opportunity; they edit rather than re-post.
+  @@unique([agreementId, freelancerId])
+  @@index([agreementId, status])
 }
 
 // Milestone (deliverable checkpoint)
@@ -93,12 +152,23 @@ model EscrowTransaction {
   agreementId       String
   agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
-  type              String   // "fund", "claim", "refund"
+  // "fund"   the client's on-chain payment into the escrow wallet
+  // "claim"  the payout from the escrow wallet to the freelancer
+  // "refund" the escrow returned to the client
+  type              String
   status            String   @default("pending") // pending, confirmed, failed
   txHash            String?  // On-chain Nimiq transaction hash
+  amountNIM         Decimal? // What actually moved, for the outflow ceiling
 
   createdAt         DateTime @default(now())
   confirmedAt       DateTime?
+
+  // The idempotency guarantee for payouts, enforced by the database rather than
+  // by a check-then-act in application code: a second concurrent claim for the
+  // same deal loses this insert and never reaches the signing step. One row per
+  // movement type per deal is all the escrow lifecycle ever needs.
+  @@unique([agreementId, type])
+  @@index([type, status, createdAt])
 }
 
 // Message (agreement chat)

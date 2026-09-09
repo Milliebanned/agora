@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, Plus, ArrowUpRight } from 'lucide-react'
+import { FileText, Plus, ArrowUpRight, Compass } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
@@ -11,18 +11,19 @@ import { PageHeader, StatTile, EmptyState, PageLoading } from '@/components/ui/p
 import { ROLE_TAGLINES } from '@/lib/roles'
 import type { UserRole } from '@/lib/types'
 
-interface Agreement {
+interface Deal {
   id: string
   title: string
   status: string
-  amountNIM: number
+  amountNIM: string | number
   deadline: string
+  htlcHashRoot?: string | null
   htlcAddress?: string | null
 }
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [agreements, setAgreements] = useState<Agreement[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
   const [trustScore, setTrustScore] = useState(50)
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
@@ -38,12 +39,12 @@ export default function DashboardPage() {
         const session = await sessionRes.json()
         setRole(session.user.role ?? null)
 
-        const [agreementsRes, profileRes] = await Promise.all([
+        const [dealsRes, profileRes] = await Promise.all([
           fetch('/api/agreements', { credentials: 'include' }),
           fetch(`/api/users/${session.user.id}`, { credentials: 'include' }),
         ])
 
-        if (agreementsRes.ok) setAgreements(await agreementsRes.json())
+        if (dealsRes.ok) setDeals(await dealsRes.json())
         if (profileRes.ok) {
           const profile = await profileRes.json()
           setTrustScore(profile?.reputation?.trustScore ?? 50)
@@ -59,12 +60,17 @@ export default function DashboardPage() {
 
   if (loading) return <PageLoading />
 
-  const active = agreements.filter((a) => a.status === 'active')
-  const pending = agreements.filter((a) => a.status === 'draft')
-  const disputed = agreements.filter((a) => a.status === 'disputed')
-  const escrowBalance = active
-    .filter((a) => a.htlcAddress)
-    .reduce((sum, a) => sum + Number(a.amountNIM), 0)
+  // Work in flight is anything with a freelancer on it; a posting still taking
+  // proposals is counted separately because it needs a different action.
+  const active = deals.filter((d) => d.status === 'locked' || d.status === 'submitted')
+  const listed = deals.filter((d) => d.status === 'open')
+  const disputed = deals.filter((d) => d.status === 'disputed')
+  // Committed money is money the client can no longer spend, whether or not the
+  // HTLC has been created yet — showing only on-chain contracts would understate
+  // what is actually tied up.
+  const escrowBalance = [...active, ...listed, ...disputed]
+    .filter((d) => d.htlcHashRoot)
+    .reduce((sum, d) => sum + Number(d.amountNIM), 0)
 
   return (
     <>
@@ -74,22 +80,30 @@ export default function DashboardPage() {
           role ? ROLE_TAGLINES[role] : 'Your active deals, escrow, and standing at a glance.'
         }
         action={
-          <Link href="/dashboard/agreements/create">
-            <Button size="default">
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-              New agreement
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/dashboard/opportunities">
+              <Button variant="secondary">
+                <Compass className="h-4 w-4" />
+                Browse
+              </Button>
+            </Link>
+            <Link href="/dashboard/opportunities/new">
+              <Button>
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                Post
+              </Button>
+            </Link>
+          </div>
         }
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Active" value={active.length} />
-        <StatTile label="Pending" value={pending.length} />
+        <StatTile label="In progress" value={active.length} hint="freelancer engaged" />
+        <StatTile label="Taking proposals" value={listed.length} hint="live on the board" />
         <StatTile
           label="In escrow"
           value={escrowBalance.toFixed(2)}
-          hint="NIM locked in HTLCs"
+          hint="NIM committed"
           accent={escrowBalance > 0}
         />
         <StatTile label="Trust score" value={`${Math.round(trustScore)}`} hint="out of 100" />
@@ -102,7 +116,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
                 <span className="text-[14px] text-secondary-foreground">
-                  {disputed.length} agreement{disputed.length > 1 ? 's' : ''} in dispute
+                  {disputed.length} deal{disputed.length > 1 ? 's' : ''} in dispute
                 </span>
               </div>
               <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
@@ -113,8 +127,8 @@ export default function DashboardPage() {
 
       <section className="mt-10">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[15px] font-medium tracking-body">Recent agreements</h2>
-          {agreements.length > 0 && (
+          <h2 className="text-[15px] font-medium tracking-body">Recent deals</h2>
+          {deals.length > 0 && (
             <Link
               href="/dashboard/agreements"
               className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
@@ -124,35 +138,44 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {agreements.length === 0 ? (
+        {deals.length === 0 ? (
           <EmptyState
             icon={FileText}
-            title="No agreements yet"
+            title="No deals yet"
             description={
               role === 'provider'
-                ? 'Draft the terms for work you are offering, then share it with the client so they can fund the escrow.'
-                : 'Describe a deal in plain English and let AI draft the contract, then lock the payment in escrow.'
+                ? 'Every posting on the board has its budget already committed to escrow, so the money is there before you write a proposal.'
+                : 'Describe the work you need, commit the budget to escrow, and pick from the proposals that come in.'
             }
             action={
-              <Link href="/dashboard/agreements/create">
-                <Button>
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Create your first agreement
-                </Button>
-              </Link>
+              role === 'provider' ? (
+                <Link href="/dashboard/opportunities">
+                  <Button>
+                    <Compass className="h-4 w-4" />
+                    Browse opportunities
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/dashboard/opportunities/new">
+                  <Button>
+                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    Post your first opportunity
+                  </Button>
+                </Link>
+              )
             }
           />
         ) : (
           <div className="overflow-hidden rounded-lg shadow-hairline">
-            {agreements.slice(0, 5).map((a, i) => (
-              <Link key={a.id} href={`/dashboard/agreements/${a.id}`}>
+            {deals.slice(0, 5).map((a, i) => (
+              <Link key={a.id} href={`/dashboard/opportunities/${a.id}`}>
                 <div
                   className={`flex items-center justify-between gap-4 bg-card px-4 py-3.5 transition-colors hover:bg-surface ${
                     i > 0 ? 'border-t border-border' : ''
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <StatusBadge status={a.status} />
+                    <StatusBadge status={a.status} tone={a.status === 'open' ? 'accent' : undefined} />
                     <span className="truncate text-[14px] text-secondary-foreground">
                       {a.title}
                     </span>

@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, FileText, Scale, User, Lock, LogOut, Plus } from 'lucide-react'
+import { Home, Compass, FileText, Scale, User, Lock, LogOut, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
   { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/dashboard/agreements', label: 'Agreements', icon: FileText },
+  { href: '/dashboard/opportunities', label: 'Opportunities', icon: Compass },
+  { href: '/dashboard/agreements', label: 'Deals', icon: FileText },
   { href: '/dashboard/disputes', label: 'Disputes', icon: Scale },
   { href: '/dashboard/profile', label: 'Profile', icon: User },
 ]
@@ -30,10 +31,10 @@ export default function Sidebar() {
         <span className="text-[15px] font-medium tracking-body">NimTrust</span>
       </Link>
 
-      <Link href="/dashboard/agreements/create" className="mb-4">
+      <Link href="/dashboard/opportunities/new" className="mb-4">
         <span className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent text-[13px] font-medium text-accent-foreground transition hover:brightness-110">
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-          New agreement
+          Post opportunity
         </span>
       </Link>
 

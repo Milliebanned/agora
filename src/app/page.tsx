@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
+  Compass,
   Sparkles,
   ShieldCheck,
   Star,
@@ -19,9 +20,9 @@ import { useWalletLogin } from '@/hooks/useWalletLogin'
 
 const FEATURES = [
   {
-    icon: Sparkles,
-    title: 'AI agreement builder',
-    body: 'Describe the deal in plain English. Claude returns a structured contract — scope, deliverables, milestones, timeline, and refund terms — before a single NIM moves.',
+    icon: Compass,
+    title: 'Funded-only opportunity board',
+    body: 'Clients post structured briefs — category, scope, deliverables, budget, timeline — and commit the budget to escrow before the posting goes public. Nothing on the board is speculative.',
   },
   {
     icon: ShieldCheck,
@@ -36,15 +37,15 @@ const FEATURES = [
   {
     icon: Scale,
     title: 'AI dispute mediation',
-    body: 'When a deal stalls, Claude reviews the agreement, the milestone timeline, and the full message history, then issues a reasoned verdict.',
+    body: 'When a deal stalls, the mediator reads the submitted work against the original requirements, the timeline, and the full message history, then issues a reasoned verdict.',
   },
 ]
 
 const STEPS = [
   ['Connect', 'Sign in with your Nimiq Pay wallet. No password, no signup form.'],
-  ['Draft', 'Describe the work. AI turns it into a contract you both approve.'],
-  ['Lock', 'Buyer funds an HTLC. The seller can see the money is real.'],
-  ['Settle', 'Approve to release, or open a dispute for AI mediation.'],
+  ['Post', 'Fill in the brief and commit the budget. Only funded work reaches the board.'],
+  ['Select', 'Freelancers propose. Accepting one creates the HTLC and opens a private chat.'],
+  ['Settle', 'Approve to release the escrow, or open a dispute for AI mediation.'],
 ]
 
 export default function Home() {
@@ -104,7 +105,7 @@ export default function Home() {
         <div className="relative mx-auto max-w-content px-6 pb-24 pt-20 sm:pt-28">
           <Badge tone="neutral" className="mb-6">
             <Sparkles className="h-3 w-3" />
-            Powered by Claude
+            Escrow-backed on Nimiq
           </Badge>
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div>
@@ -114,8 +115,8 @@ export default function Home() {
                 between strangers.
               </h1>
               <p className="mt-6 max-w-xl text-body-lg font-normal text-muted-foreground">
-                NimTrust turns a plain-English deal into a real agreement, locks the payment in a
-                Nimiq HTLC escrow, and brings in an AI mediator when something goes wrong.
+                NimTrust is a marketplace where the budget is locked in a Nimiq HTLC before the
+                work is even advertised — and an AI mediator settles it if the two of you cannot.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 {signedIn ? (

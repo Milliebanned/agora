@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifySessionToken } from '@/lib/auth'
 import { generateMediatorVerdict, isGeminiConfigured } from '@/lib/gemini'
 import { formatDate, parseJsonArray } from '@/lib/utils'
+import { categoryLabel, parseAttachments } from '@/lib/opportunities'
 import prisma from '@/lib/db'
 
 // Same reason as the agreement builder: a model call blows past Vercel's 10s
@@ -29,7 +30,7 @@ export async function POST(
       include: {
         agreement: {
           include: {
-            messages: true,
+            messages: { orderBy: { createdAt: 'asc' } },
             milestones: true,
             buyer: { select: { displayName: true } },
             seller: { select: { displayName: true } },
@@ -44,45 +45,76 @@ export async function POST(
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
     }
 
-    // Format comprehensive context for AI mediator
+    // The mediator is judged on one thing: whether it read the deal that was
+    // actually struck. So the context it gets is the posting as written — the
+    // brief, the deliverables the freelancer signed up to, the money, the
+    // clock — and then what happened against it.
+    const opportunity = dispute.agreement
+    const deliverables = parseJsonArray(opportunity.deliverables)
+    const attachments = parseAttachments(opportunity.attachments)
+
     const agreementDetails = `
-Agreement: ${dispute.agreement.title}
-Amount: ${dispute.agreement.amountNIM} NIM
-Buyer: ${dispute.agreement.buyer.displayName}
-Seller: ${dispute.agreement.seller?.displayName || 'Unassigned'}
-Created: ${formatDate(dispute.agreement.createdAt)}
-Deadline: ${formatDate(dispute.agreement.deadline)}
-Status: ${dispute.agreement.status}
+Opportunity: ${opportunity.title}
+Category: ${categoryLabel(opportunity.category)}${opportunity.serviceType ? ` — ${opportunity.serviceType}` : ''}
+Posted budget: ${Number(opportunity.budgetNIM ?? opportunity.amountNIM)} NIM
+Escrow locked at: ${Number(opportunity.amountNIM)} NIM
+Client: ${opportunity.buyer.displayName ?? 'Client'}
+Freelancer: ${opportunity.seller?.displayName ?? 'Unassigned'}
+Posted: ${formatDate(opportunity.createdAt)}
+Agreed delivery deadline: ${formatDate(opportunity.deadline)}
+Current status: ${opportunity.status}
 
-Description:
-${dispute.agreement.description}
+=== ORIGINAL REQUIREMENTS (what the freelancer accepted) ===
+${opportunity.description}
 
-Terms:
-${dispute.agreement.completionTerms}
+Deliverables the freelancer committed to:
+${deliverables.length > 0 ? deliverables.map((d, i) => `${i + 1}. ${d}`).join('\n') : 'None itemised in the posting.'}
+
+Reference material supplied with the posting:
+${attachments.length > 0 ? attachments.map((a) => `- ${a.label} (${a.url})`).join('\n') : 'None.'}
+
+Completion terms: ${opportunity.completionTerms}
+Refund terms: ${opportunity.refundTerms}
 `
 
     const timeline = [
-      `Agreement created: ${formatDate(dispute.agreement.createdAt)}`,
-      ...dispute.agreement.milestones.map(
-        (m) => `Milestone "${m.title}" - ${m.status} at ${formatDate(m.createdAt)}`,
+      `Opportunity posted: ${formatDate(opportunity.createdAt)}`,
+      opportunity.publishedAt && `Budget committed and listed: ${formatDate(opportunity.publishedAt)}`,
+      opportunity.lockedAt && `Freelancer accepted, escrow locked: ${formatDate(opportunity.lockedAt)}`,
+      `Delivery was due: ${formatDate(opportunity.deadline)}`,
+      opportunity.workSubmittedAt
+        ? `Work submitted: ${formatDate(opportunity.workSubmittedAt)}${
+            opportunity.workSubmittedAt > opportunity.deadline ? ' (AFTER the deadline)' : ' (on time)'
+          }`
+        : 'No work was ever submitted.',
+      ...opportunity.milestones.map(
+        (m) => `Milestone "${m.title}" — ${m.status} at ${formatDate(m.createdAt)}`,
       ),
-      `Dispute opened by ${dispute.opener.displayName}: ${formatDate(dispute.createdAt)}`,
-    ].join('\n')
-
-    const messages = dispute.agreement.messages
-      .slice(0, 20) // Last 20 messages
-      .map((m) => `[${formatDate(m.createdAt)}] ${m.type === 'system' ? '🔔 SYSTEM' : m.type}: ${m.content}`)
+      `Dispute opened by ${dispute.opener.displayName ?? 'a party'}: ${formatDate(dispute.createdAt)}`,
+    ]
+      .filter(Boolean)
       .join('\n')
 
-    const submittedWork = dispute.agreement.milestones
-      .filter((m) => m.deliverable)
-      .map((m) => `${m.title}: ${m.deliverable}`)
-      .join('\n\n')
+    const messages = opportunity.messages
+      .slice(-40)
+      .map(
+        (m) =>
+          `[${formatDate(m.createdAt)}] ${m.type === 'system' ? 'SYSTEM' : m.senderId === opportunity.buyerId ? 'CLIENT' : 'FREELANCER'}: ${m.content}`,
+      )
+      .join('\n')
+
+    const submittedWork =
+      opportunity.workSubmission ??
+      opportunity.milestones
+        .filter((m) => m.deliverable)
+        .map((m) => `${m.title}: ${m.deliverable}`)
+        .join('\n\n')
 
     const disputeContext = `
-Dispute Reason: ${dispute.reason}
-Opened By: ${dispute.opener.displayName}
-Against: ${dispute.respondent.displayName}
+=== THE DISPUTE ===
+Raised by: ${dispute.opener.displayName ?? 'a party'} (${dispute.openerId === opportunity.buyerId ? 'the client' : 'the freelancer'})
+Against: ${dispute.respondent.displayName ?? 'the other party'}
+Their reason: ${dispute.reason}
 `
 
     // Generate verdict using Gemini
@@ -90,7 +122,7 @@ Against: ${dispute.respondent.displayName}
       agreementDetails + disputeContext,
       timeline,
       messages,
-      submittedWork || 'No work submitted',
+      submittedWork || 'No work was submitted.',
     )
 
     // Update dispute with verdict

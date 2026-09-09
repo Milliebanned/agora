@@ -18,3 +18,25 @@ export const Textarea = React.forwardRef<
   <textarea ref={ref} className={cn(fieldStyles, 'resize-y leading-relaxed', className)} {...props} />
 ))
 Textarea.displayName = 'Textarea'
+
+// Native select on purpose: the Nimiq Pay WebView renders the platform picker,
+// which beats any custom dropdown on a phone.
+export const Select = React.forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement>
+>(({ className, ...props }, ref) => (
+  <select
+    ref={ref}
+    className={cn(
+      fieldStyles,
+      'cursor-pointer appearance-none bg-[right_0.75rem_center] bg-no-repeat pr-9',
+      className,
+    )}
+    style={{
+      backgroundImage:
+        "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E\")",
+    }}
+    {...props}
+  />
+))
+Select.displayName = 'Select'

@@ -1,4 +1,5 @@
 import { jwtVerify, SignJWT } from 'jose'
+import type { NextRequest } from 'next/server'
 import type { SessionJWT } from './types'
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret-key')
@@ -32,6 +33,14 @@ export async function verifySessionToken(token: string): Promise<SessionJWT | nu
     console.error('JWT verification failed:', err)
     return null
   }
+}
+
+// Read and verify the session cookie in one step. Every API route opened with
+// the same three lines before this existed.
+export async function requireSession(request: NextRequest): Promise<SessionJWT | null> {
+  const token = request.cookies.get('session')?.value
+  if (!token) return null
+  return verifySessionToken(token)
 }
 
 // Get session from request cookies

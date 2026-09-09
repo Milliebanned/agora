@@ -137,8 +137,9 @@ export default function DisputeDetailPage() {
             <div>
               <p className="text-[15px] font-medium tracking-body">AI mediator verdict</p>
               <p className="mt-1.5 max-w-lg text-[14px] leading-relaxed text-muted-foreground">
-                Claude reviews the agreement terms, the milestone timeline, and the full message
-                history between both parties, then issues a reasoned recommendation.
+                The mediator reads the original requirements and deliverables, the delivery
+                timeline, the submitted work, and every message between you, then issues a reasoned
+                recommendation.
               </p>
             </div>
             <Button onClick={handleGetVerdict} disabled={mediating}>
@@ -204,11 +205,11 @@ export default function DisputeDetailPage() {
         </Card>
       )}
 
-      <Link href={`/dashboard/agreements/${dispute.agreement.id}`}>
+      <Link href={`/dashboard/opportunities/${dispute.agreement.id}`}>
         <Card className="mt-3 transition-colors hover:bg-surface">
           <div className="flex items-center justify-between gap-4 p-5">
             <div className="min-w-0">
-              <p className="text-[13px] text-muted-foreground">Related agreement</p>
+              <p className="text-[13px] text-muted-foreground">Related opportunity</p>
               <p className="mt-1 truncate text-[15px] font-medium tracking-body">
                 {dispute.agreement.title}
               </p>

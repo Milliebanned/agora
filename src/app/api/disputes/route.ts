@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySessionToken } from '@/lib/auth'
+import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { recordDispute } from '@/lib/reputation'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = request.cookies.get('session')?.value
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await verifySessionToken(session)
+    const user = await requireSession(request)
     if (!user) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const disputes = await prisma.dispute.findMany({
@@ -35,14 +31,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = request.cookies.get('session')?.value
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await verifySessionToken(session)
+    const user = await requireSession(request)
     if (!user) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { agreementId, reason } = await request.json()
@@ -69,8 +60,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create dispute
-    const disputeOpener = agreement.buyerId === user.userId ? 'buyer' : 'seller'
+    // There is nothing to dispute until an engagement exists: an open posting
+    // has no counterparty and no locked funds.
+    if (agreement.status !== 'locked' && agreement.status !== 'submitted') {
+      return NextResponse.json(
+        { error: `A ${agreement.status} opportunity cannot be disputed` },
+        { status: 400 },
+      )
+    }
+
     const respondentId =
       agreement.buyerId === user.userId ? agreement.sellerId : agreement.buyerId
 
@@ -78,19 +76,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot open dispute without respondent' }, { status: 400 })
     }
 
-    const dispute = await prisma.dispute.create({
-      data: {
-        agreementId,
-        openerId: user.userId,
-        respondentId,
-        reason,
-        status: 'open',
-      },
-      include: {
-        opener: true,
-        respondent: true,
-      },
-    })
+    // The opportunity itself moves to disputed, so the board, the deals list
+    // and the escrow panel all stop offering actions that are now off the table.
+    const [dispute] = await prisma.$transaction([
+      prisma.dispute.create({
+        data: {
+          agreementId,
+          openerId: user.userId,
+          respondentId,
+          reason: String(reason).slice(0, 4000),
+          status: 'open',
+        },
+        include: { opener: true, respondent: true },
+      }),
+      prisma.agreement.update({ where: { id: agreementId }, data: { status: 'disputed' } }),
+      prisma.message.create({
+        data: {
+          agreementId,
+          senderId: user.userId,
+          type: 'system',
+          content: `Dispute opened. The AI mediator reviews this deal against its original requirements, the timeline, and this chat.`,
+        },
+      }),
+    ])
+
+    await recordDispute([agreement.buyerId, agreement.sellerId])
 
     return NextResponse.json(dispute, { status: 201 })
   } catch (error) {

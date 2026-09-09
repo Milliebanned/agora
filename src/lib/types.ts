@@ -14,13 +14,30 @@ export interface User {
   updatedAt: Date
 }
 
+// Where an opportunity sits in its life. See the Agreement model comment in
+// prisma/schema.prisma for what each stage means.
+export type OpportunityStatus =
+  | 'draft'
+  | 'open'
+  | 'locked'
+  | 'submitted'
+  | 'completed'
+  | 'disputed'
+  | 'cancelled'
+
 export interface Agreement {
   id: string
   title: string
   description: string
-  status: 'draft' | 'active' | 'completed' | 'disputed' | 'cancelled'
+  status: OpportunityStatus
   buyerId: string
   sellerId?: string
+  category?: string
+  serviceType?: string
+  timelineDays?: number
+  budgetNIM?: number
+  attachments: Array<{ label: string; url: string }>
+  workSubmission?: string
   amountNIM: number
   deadline: Date
   deliverables: string[]
@@ -31,6 +48,22 @@ export interface Agreement {
   htlcPreImage?: string
   htlcTimeout?: number
   riskFlags: string[]
+  createdAt: Date
+  updatedAt: Date
+  publishedAt?: Date
+  lockedAt?: Date
+  workSubmittedAt?: Date
+  completedAt?: Date
+}
+
+export interface Proposal {
+  id: string
+  agreementId: string
+  freelancerId: string
+  coverLetter: string
+  bidNIM: number
+  deliveryDays: number
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn'
   createdAt: Date
   updatedAt: Date
 }
@@ -88,21 +121,6 @@ export interface ReputationScore {
   disputeRate: number
   trustScore: number
   updatedAt: Date
-}
-
-export interface AgreementGenerated {
-  title: string
-  scope: string
-  deliverables: string[]
-  timeline_days: number
-  milestones: Array<{
-    title: string
-    description: string
-  }>
-  amount_nim: number
-  completion_conditions: string
-  refund_conditions: string
-  risk_flags: string[]
 }
 
 export interface MediatorVerdict {
