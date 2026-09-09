@@ -140,7 +140,7 @@ export async function signAndSendTransaction(txData: any) {
 
 ### Key Files to Read First
 
-1. `CLAUDE.md` — understand the architecture & Gemini model split (3.8 Flash vs 3.5 Flash-Lite)
+1. `CLAUDE.md` — understand the architecture & Gemini model split (3.6 Flash vs 3.5 Flash-Lite)
 2. `SETUP_INSTRUCTIONS.md` — complete the setup
 3. `prisma/schema.prisma` — understand the data model
 4. `src/lib/types.ts` — TypeScript interfaces (shared across all endpoints)
@@ -154,7 +154,7 @@ export async function signAndSendTransaction(txData: any) {
 - Supabase provides Realtime for messaging + Storage for files (built-in, no extra infrastructure)
 
 ### AI Integration Strategy
-- **Gemini 3.8 Flash** (reasoning-heavy): agreement generation, dispute mediation
+- **Gemini 3.6 Flash** (reasoning-heavy): agreement generation, dispute mediation
 - **Gemini 3.5 Flash-Lite** (cheap, fast): AI assistant chat, quick risk-flag checks
 - **Structured output via tool use/JSON schema** for reliable parsing
 

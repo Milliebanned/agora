@@ -114,7 +114,7 @@ git commit -m "Initial NimTrust scaffold with Next.js, Prisma, Nimiq SDK, and Cl
 - Project structure (app router, API routes, lib utilities)
 - Authentication (wallet login via message signing)
 - Database schema (users, agreements, escrow, disputes, messages)
-- Gemini AI integration (3.8 Flash for generation/mediation, 3.5 Flash-Lite for chat/flags)
+- Gemini AI integration (3.6 Flash for generation/mediation, 3.5 Flash-Lite for chat/flags)
 - Core API stubs (auth, agreements, disputes, AI)
 - Day 1 spike task: validate HTLC transaction-signing method
 

@@ -19,7 +19,7 @@
 | **Database** | Supabase Postgres + Prisma | prisma/schema.prisma, src/lib/db.ts |
 | **Auth** | Wallet signing (no passwords) | src/lib/auth.ts, src/app/api/auth/ |
 | **Blockchain** | Nimiq SDK + HTLC | src/lib/nimiq.ts (⚠️ spike placeholders) |
-| **AI** | Gemini 3.8 Flash + 3.5 Flash-Lite | src/lib/gemini.ts |
+| **AI** | Gemini 3.6 Flash + 3.5 Flash-Lite | src/lib/gemini.ts |
 | **Hosting** | Vercel + Supabase config | .env.example, SETUP_INSTRUCTIONS.md |
 
 ### Scope (Deep MVP from Plan)
@@ -268,7 +268,7 @@ export async function signAndSendTransaction(txData: any) {
 - Use Prisma Studio (`npx prisma studio`) to test queries visually
 
 ### Claude API Usage
-- Gemini 3.8 Flash: agreement generation, dispute mediation (structured output via response_format schema)
+- Gemini 3.6 Flash: agreement generation, dispute mediation (structured output via response_format schema)
 - Gemini 3.5 Flash-Lite: AI assistant chat, quick risk checks
 - One API key, one client; model tier picked per call and overridable via GEMINI_REASONING_MODEL / GEMINI_FAST_MODEL
 
