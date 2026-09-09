@@ -6,13 +6,17 @@ import { shortAddress, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { PageHeader, StatTile, PageLoading } from '@/components/ui/page'
+import { ROLE_LABELS, ROLE_TAGLINES, roleLabel } from '@/lib/roles'
+import type { UserRole } from '@/lib/types'
 
 interface UserProfile {
   id: string
   address: string
   displayName: string
   bio?: string
+  role?: UserRole | null
   createdAt: string
   reputation: {
     trustScore: number
@@ -38,6 +42,7 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
   const [saving, setSaving] = useState(false)
+  const [switchingRole, setSwitchingRole] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -84,6 +89,24 @@ export default function ProfilePage() {
     }
   }
 
+  const switchRole = async (role: UserRole) => {
+    if (!profile || profile.role === role) return
+    setSwitchingRole(true)
+    try {
+      const res = await fetch('/api/auth/role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+        credentials: 'include',
+      })
+      if (res.ok) setProfile({ ...profile, role })
+    } catch (err) {
+      console.error('Failed to switch role:', err)
+    } finally {
+      setSwitchingRole(false)
+    }
+  }
+
   if (loading) return <PageLoading />
   if (!profile) return <PageLoading label="Profile not found" />
 
@@ -113,7 +136,10 @@ export default function ProfilePage() {
               {profile.displayName.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2 className="text-[20px] font-medium tracking-heading">{profile.displayName}</h2>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-[20px] font-medium tracking-heading">{profile.displayName}</h2>
+                <Badge tone={profile.role ? 'accent' : 'neutral'}>{roleLabel(profile.role)}</Badge>
+              </div>
               <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">
                 {shortAddress(profile.address)}
               </p>
@@ -188,6 +214,30 @@ export default function ProfilePage() {
           </div>
         </Card>
       )}
+
+      <Card className="mt-3">
+        <div className="p-6">
+          <p className="text-[13px] font-medium text-secondary-foreground">Marketplace side</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            {profile.role
+              ? ROLE_TAGLINES[profile.role]
+              : 'Pick the side you are on to tailor your dashboard.'}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => (
+              <Button
+                key={role}
+                variant={profile.role === role ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => switchRole(role)}
+                disabled={switchingRole}
+              >
+                {ROLE_LABELS[role]}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       <div className="mt-8">
         <h2 className="mb-4 text-[15px] font-medium tracking-body">Reputation</h2>

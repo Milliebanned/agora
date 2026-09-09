@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
 import { PageHeader, StatTile, EmptyState, PageLoading } from '@/components/ui/page'
+import { ROLE_TAGLINES } from '@/lib/roles'
+import type { UserRole } from '@/lib/types'
 
 interface Agreement {
   id: string
@@ -22,6 +24,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [agreements, setAgreements] = useState<Agreement[]>([])
   const [trustScore, setTrustScore] = useState(50)
+  const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,6 +36,7 @@ export default function DashboardPage() {
           return
         }
         const session = await sessionRes.json()
+        setRole(session.user.role ?? null)
 
         const [agreementsRes, profileRes] = await Promise.all([
           fetch('/api/agreements', { credentials: 'include' }),
@@ -66,7 +70,9 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title="Home"
-        description="Your active deals, escrow, and standing at a glance."
+        description={
+          role ? ROLE_TAGLINES[role] : 'Your active deals, escrow, and standing at a glance.'
+        }
         action={
           <Link href="/dashboard/agreements/create">
             <Button size="default">
@@ -122,7 +128,11 @@ export default function DashboardPage() {
           <EmptyState
             icon={FileText}
             title="No agreements yet"
-            description="Describe a deal in plain English and let AI draft the contract, then lock the payment in escrow."
+            description={
+              role === 'provider'
+                ? 'Draft the terms for work you are offering, then share it with the client so they can fund the escrow.'
+                : 'Describe a deal in plain English and let AI draft the contract, then lock the payment in escrow.'
+            }
             action={
               <Link href="/dashboard/agreements/create">
                 <Button>

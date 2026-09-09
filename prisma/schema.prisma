@@ -15,6 +15,10 @@ model User {
   address           String   @unique // Nimiq wallet address
   displayName       String?
   bio               String?
+  // Marketplace side chosen right after wallet connect.
+  // "provider" = offers services, "client" = requires services.
+  // Null until the user picks one on /onboarding.
+  role              String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

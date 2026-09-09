@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
         id: user.id,
         address: user.address,
         displayName: user.displayName,
+        // Null on a first connect — the client routes to /onboarding to pick a side.
+        role: user.role,
       },
     })
 
