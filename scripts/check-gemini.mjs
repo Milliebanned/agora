@@ -25,14 +25,16 @@ if (!key) {
 }
 console.log(`✓ GEMINI_API_KEY present (${key.slice(0, 6)}…${key.slice(-4)})`)
 
-const reasoning = process.env.GEMINI_REASONING_MODEL || 'gemini-3.8-flash'
+const reasoning = process.env.GEMINI_REASONING_MODEL || 'gemini-3.6-flash'
 const fast = process.env.GEMINI_FAST_MODEL || 'gemini-3.5-flash-lite'
 const ai = new GoogleGenAI({ apiKey: key })
 
 let failed = false
-for (const [label, model] of [
-  ['reasoning', reasoning],
-  ['fast', fast],
+// Thinking levels are per-model: the Flash reasoning models reject "minimal",
+// while the Lite models accept it. Probe each at a level it actually supports.
+for (const [label, model, thinkingLevel] of [
+  ['reasoning', reasoning, 'low'],
+  ['fast', fast, 'minimal'],
 ]) {
   try {
     const interaction = await ai.interactions.create({
@@ -47,7 +49,7 @@ for (const [label, model] of [
           required: ['ok'],
         },
       },
-      generation_config: { max_output_tokens: 200, thinking_level: 'minimal' },
+      generation_config: { max_output_tokens: 200, thinking_level: thinkingLevel },
     })
     const parsed = JSON.parse(interaction.output_text)
     console.log(`✓ ${label} model "${model}" responded: ${JSON.stringify(parsed)}`)

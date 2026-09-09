@@ -38,7 +38,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **Database:** Supabase Postgres + Prisma ORM
 - **Auth:** Wallet-based (message signing)
 - **Blockchain:** Nimiq SDK + HTLC escrow
-- **AI:** Google Gemini (3.8 Flash for reasoning, 3.5 Flash-Lite for fast passes)
+- **AI:** Google Gemini (3.6 Flash for reasoning, 3.5 Flash-Lite for fast passes)
 - **Hosting:** Vercel + Supabase
 
 ## Key Features

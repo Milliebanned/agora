@@ -8,7 +8,7 @@
 - **Database:** Supabase Postgres + Prisma ORM (Realtime for messaging)
 - **Auth:** Wallet-based (message signing, no passwords)
 - **Blockchain:** `@nimiq/mini-app-sdk` (wallet/signing) + `@nimiq/core` (HTLC transactions)
-- **AI:** Google Gemini — 3.8 Flash (agreement generation, mediation) + 3.5 Flash-Lite (chat, quick flags)
+- **AI:** Google Gemini — 3.6 Flash (agreement generation, mediation) + 3.5 Flash-Lite (chat, quick flags)
 - **Hosting:** Vercel (frontend) + Supabase (backend)
 
 ## Nimiq Mini App Basics
@@ -31,7 +31,7 @@ Nimiq natively supports Hashed Time-Locked Contracts (not a custom smart contrac
 
 ## Gemini API Patterns
 
-- **Gemini 3.8 Flash** (reasoning-heavy): agreement generation (user request → structured contract), dispute mediation (review agreement + timeline + messages → verdict).
+- **Gemini 3.6 Flash** (reasoning-heavy): agreement generation (user request → structured contract), dispute mediation (review agreement + timeline + messages → verdict).
 - **Gemini 3.5 Flash-Lite** (cheap, fast): AI Assistant chat, quick risk-flag checks.
 
 Use structured output via `response_format: { type: 'text', mime_type: 'application/json', schema }` for agreement & mediation — the schema is enforced server-side, so no prompt-level "return valid JSON" pleading.

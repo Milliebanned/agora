@@ -9,7 +9,12 @@ import type { AgreementGenerated, MediatorVerdict } from './types'
 //   FAST      — assistant chat and quick risk-flag passes. High volume, cheap.
 //
 // Both are overridable by env var so a model can be swapped without a deploy.
-const REASONING_MODEL = process.env.GEMINI_REASONING_MODEL || 'gemini-3.8-flash'
+//
+// The reasoning default is 3.6 Flash rather than 3.8: on Google's free tier
+// 3.8 Flash is capped at 20 requests and returns 429 almost immediately, which
+// is not survivable for a live demo. With billing enabled, set
+// GEMINI_REASONING_MODEL=gemini-3.8-flash for the stronger model.
+const REASONING_MODEL = process.env.GEMINI_REASONING_MODEL || 'gemini-3.6-flash'
 const FAST_MODEL = process.env.GEMINI_FAST_MODEL || 'gemini-3.5-flash-lite'
 
 let client: GoogleGenAI | null = null
