@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, FileText, Scale, User, Lock, LogOut, Plus } from 'lucide-react'
+import { Home, Compass, FileText, Scale, User, Lock, LogOut, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // NimTrust runs inside the Nimiq Pay WebView, so the phone is the primary
@@ -10,7 +10,8 @@ import { cn } from '@/lib/utils'
 // for identity and the primary action, and a thumb-reachable bottom tab bar.
 const TABS = [
   { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/dashboard/agreements', label: 'Agreements', icon: FileText },
+  { href: '/dashboard/opportunities', label: 'Browse', icon: Compass },
+  { href: '/dashboard/agreements', label: 'Deals', icon: FileText },
   { href: '/dashboard/disputes', label: 'Disputes', icon: Scale },
   { href: '/dashboard/profile', label: 'Profile', icon: User },
 ]
@@ -33,7 +34,7 @@ export function MobileTopBar() {
       </Link>
 
       <div className="flex items-center gap-1">
-        <Link href="/dashboard/agreements/create">
+        <Link href="/dashboard/opportunities/new">
           <span className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-[13px] font-medium text-accent-foreground">
             <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
             New
@@ -56,7 +57,7 @@ export function MobileTabBar() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background/95 backdrop-blur-xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur-xl lg:hidden"
       // Keeps the bar clear of the home indicator on notched phones.
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >

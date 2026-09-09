@@ -1,11 +1,16 @@
 import { GoogleGenAI } from '@google/genai'
-import type { AgreementGenerated, MediatorVerdict } from './types'
+import type { MediatorVerdict } from './types'
 
-// Google Gemini powers every AI feature in NimTrust.
+// Google Gemini powers the AI features that remain in NimTrust.
+//
+// Agreements are no longer drafted by a model: clients fill in a structured
+// opportunity form and the escrow is the source of truth. Judgement is reserved
+// for the one place it belongs — reading a dispute against what was actually
+// agreed.
 //
 // Two tiers, mirroring how the app uses the model:
-//   REASONING — agreement drafting and dispute mediation. Real judgement,
-//               worth the tokens and the thinking budget.
+//   REASONING — dispute mediation. Real judgement, worth the tokens and the
+//               thinking budget.
 //   FAST      — assistant chat and quick risk-flag passes. High volume, cheap.
 //
 // Both are overridable by env var so a model can be swapped without a deploy.
@@ -36,50 +41,6 @@ export function isGeminiConfigured() {
 // Schemas are enforced by the API, not merely requested in the prompt. This is
 // the main reliability win over asking for "valid JSON, no markdown" — the
 // model cannot return prose, a code fence, or a missing field.
-const AGREEMENT_SCHEMA = {
-  type: 'object',
-  properties: {
-    title: { type: 'string', description: 'Short title for the agreement' },
-    scope: { type: 'string', description: 'What will be done, in full sentences' },
-    deliverables: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Concrete artifacts the provider hands over',
-    },
-    timeline_days: { type: 'integer', description: 'Total working days to completion' },
-    milestones: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          description: { type: 'string' },
-        },
-        required: ['title', 'description'],
-      },
-    },
-    amount_nim: { type: 'number', description: 'Total payment in NIM' },
-    completion_conditions: { type: 'string' },
-    refund_conditions: { type: 'string' },
-    risk_flags: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Concrete risks either party should know about before funding',
-    },
-  },
-  required: [
-    'title',
-    'scope',
-    'deliverables',
-    'timeline_days',
-    'milestones',
-    'amount_nim',
-    'completion_conditions',
-    'refund_conditions',
-    'risk_flags',
-  ],
-}
-
 const VERDICT_SCHEMA = {
   type: 'object',
   properties: {
@@ -135,24 +96,6 @@ async function generateJson<T>(
   } catch {
     throw new Error(`Gemini (${model}) returned unparseable JSON: ${text.slice(0, 300)}`)
   }
-}
-
-// Turn a plain-English request into a structured agreement.
-export async function generateAgreement(userRequest: string) {
-  return generateJson<AgreementGenerated>(
-    REASONING_MODEL,
-    `You are drafting a peer-to-peer service agreement for NimTrust, where payment is
-locked in a Nimiq HTLC escrow and released when the buyer approves the work.
-
-Draft the agreement for this request:
-"${userRequest}"
-
-Be concrete and even-handed. Split the work into milestones that can each be
-judged done or not done. If the request leaves the amount or the timeline
-unstated, choose a reasonable figure and flag the assumption in risk_flags.`,
-    AGREEMENT_SCHEMA,
-    { maxOutputTokens: 2500, thinkingLevel: 'low' },
-  )
 }
 
 // The AI mediator: review a stalled deal and issue a reasoned verdict.

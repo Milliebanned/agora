@@ -55,7 +55,7 @@ export default function DisputesPage() {
         <EmptyState
           icon={Scale}
           title="No disputes"
-          description="If a deal stalls, either party can open a dispute. Claude reviews the agreement, milestone timeline, and messages, then issues a reasoned verdict."
+          description="If a deal stalls, either party can open a dispute. The AI mediator reads the submitted work against the original requirements, the timeline, and the whole message history, then issues a reasoned verdict."
         />
       ) : (
         <div className="overflow-hidden rounded-lg shadow-hairline">

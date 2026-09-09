@@ -1,8 +1,6 @@
 // Nimiq SDK integration for NimTrust
 // SPIKE TASK DAY 1: Validate exact SDK method names for HTLC transaction signing
 
-import type { SessionJWT } from './types'
-
 // The real SDK's init() waits for the native Nimiq Pay provider handshake,
 // which never arrives outside the Nimiq Pay WebView (e.g. a desktop browser
 // during local dev). NEXT_PUBLIC_MOCK_WALLET=true swaps in a fake provider
@@ -18,15 +16,51 @@ function isError<T>(result: T | ErrorLike): result is ErrorLike {
   return Boolean(result) && typeof result === 'object' && 'error' in (result as object)
 }
 
+// Which account the mock wallet pretends to be.
+//
+// A single hardcoded address made the mock useless for testing the actual
+// product: the client and the freelancer would be the same person, so no
+// proposal could ever be accepted. The address is therefore overridable per
+// browser — open the app once with ?mock=NQ..., and that profile keeps that
+// identity. Two browser profiles become two users.
+//
+// Point one of them at a real testnet address you control and the payout at the
+// end of the flow arrives as real testnet NIM.
+const DEFAULT_MOCK_ADDRESS = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000'
+const MOCK_ADDRESS_KEY = 'nimtrust.mockAddress'
+
+function mockAddress(): string {
+  if (typeof window === 'undefined') return DEFAULT_MOCK_ADDRESS
+  try {
+    const fromQuery = new URLSearchParams(window.location.search).get('mock')
+    if (fromQuery) {
+      // URLSearchParams has already decoded this; decoding again would throw on
+      // a literal percent sign.
+      const cleaned = fromQuery.trim()
+      window.localStorage.setItem(MOCK_ADDRESS_KEY, cleaned)
+      return cleaned
+    }
+    return window.localStorage.getItem(MOCK_ADDRESS_KEY) || DEFAULT_MOCK_ADDRESS
+  } catch {
+    // Private browsing can throw on storage access; the default still works.
+    return DEFAULT_MOCK_ADDRESS
+  }
+}
+
 function mockNimiqProvider() {
+  const address = mockAddress()
   return {
-    listAccounts: async () => ['NQ07 0000 0000 0000 0000 0000 0000 0000 0000'],
+    listAccounts: async () => [address],
     sign: async (_message: string | { message: string; isHex?: boolean }) => ({
       publicKey: '0x' + '0'.repeat(64),
       signature: '0x' + '0'.repeat(128),
     }),
     isConsensusEstablished: async () => true,
     getBlockNumber: async () => 1,
+    // No NIM moves. The server must be told to skip on-chain verification
+    // (NIMIQ_SKIP_ESCROW_VERIFICATION=true) or funding will correctly refuse.
+    sendBasicTransaction: async (_tx: { recipient: string; value: number }) =>
+      'mock-transaction-not-on-chain',
   }
 }
 
@@ -37,7 +71,9 @@ export async function initNimiq(): Promise<NimiqLike | null> {
   if (typeof window === 'undefined') return null
 
   if (MOCK_WALLET) {
-    console.warn('Using mock Nimiq wallet provider (NEXT_PUBLIC_MOCK_WALLET=true) — dev only')
+    console.warn(
+      `Using mock Nimiq wallet provider (NEXT_PUBLIC_MOCK_WALLET=true) — dev only. Acting as ${mockAddress()}. Override with ?mock=NQ...`,
+    )
     return mockNimiqProvider()
   }
 
@@ -117,65 +153,73 @@ export async function requestDeviceIdentifier(reason: string) {
   }
 }
 
-// Build unsigned HTLC creation transaction
-export async function buildHTLCCreationTx(
-  buyerAddress: string,
-  sellerAddress: string,
-  amountNIM: number,
-  hashRoot: string,
-  timeoutBlocks: number,
-) {
-  try {
-    // Nimiq HTLC data structure
-    // recipient_type: 2 indicates HTLC account
-    // The data bytes encode the HTLC parameters
-    const htlcData = {
-      sender: buyerAddress,
-      recipient: sellerAddress,
-      balance: BigInt(Math.floor(amountNIM * 1e5)), // 1 NIM = 100,000 lunar
-      hash_root: hashRoot,
-      hash_algorithm: 3, // SHA256 (1=Blake2b)
-      hash_count: 1,
-      timeout: timeoutBlocks,
+// SPIKE, SETTLED: @nimiq/mini-app-sdk v0.1.0 cannot create a contract.
+//
+// Its WALLET_METHODS whitelist is exactly: listAccounts, sign,
+// sendBasicTransaction, sendBasicTransactionWithData, and the six staking
+// methods. There is no HTLC creation, and `sign()` signs messages, not
+// transactions. So a mini app can move NIM to an address and nothing more.
+//
+// What that buys us is still real: the client's payment into escrow is an
+// ordinary on-chain transfer, it triggers the native Nimiq Pay confirmation,
+// and the server verifies it against the chain before the posting goes live.
+
+export interface BasicTransferRequest {
+  recipient: string
+  /** Amount in luna. 1 NIM = 100,000 luna. */
+  value: number
+  fee?: number
+}
+
+export interface TransferOutcome {
+  ok: boolean
+  /** The serialized transaction the wallet returns, when it returns one. */
+  serialized?: string
+  txHash?: string
+  /** Why it did not go through, in words a person can act on. */
+  reason?: string
+}
+
+// Ask the wallet to pay the escrow address. Nimiq Pay shows its own
+// confirmation dialog; the user can refuse, and refusing is not an error.
+export async function sendBasicTransaction(
+  req: BasicTransferRequest,
+): Promise<TransferOutcome> {
+  const nimiq = await initNimiq()
+  if (!nimiq) {
+    return {
+      ok: false,
+      reason:
+        'No Nimiq Pay wallet is connected. Open this Mini App inside Nimiq Pay — a desktop browser has no wallet to ask.',
     }
-
-    return htlcData
-  } catch (err) {
-    console.error('Failed to build HTLC creation tx:', err)
-    return null
   }
-}
 
-// Sign and send transaction (hands off to native Nimiq Pay dialog)
-export async function signAndSendTransaction(txData: any) {
-  if (typeof window === 'undefined') return null
+  if (typeof (nimiq as Record<string, unknown>).sendBasicTransaction !== 'function') {
+    return { ok: false, reason: 'This wallet does not support sending transactions.' }
+  }
 
   try {
-    const nimiq = await initNimiq()
-    if (!nimiq) return null
+    const result = await nimiq.sendBasicTransaction({
+      recipient: req.recipient,
+      value: req.value,
+      ...(req.fee !== undefined ? { fee: req.fee } : {}),
+    })
+    if (isError(result)) return { ok: false, reason: result.error.message }
 
-    // HTLC-specific signing path
-    // The SDK should expose: nimiq.signTransaction(txData) or similar
-    // This triggers the native Nimiq Pay confirmation dialog
-    // User signs → transaction is broadcast → returns tx hash
-
-    // Placeholder for SDK method (needs validation against real @nimiq/mini-app-sdk)
-    // Expected signature: nimiq.sendTransaction(transaction) -> { hash: string }
-
-    console.warn('signAndSendTransaction: Ensure Nimiq Pay is active in WebView context')
-
-    // TODO: Replace with actual SDK call once validated:
-    // const result = await nimiq.sendTransaction(txData)
-    // return result
-
-    return null // Return actual tx hash from SDK
+    // The SDK types this as "the serialized transaction". Some builds return an
+    // object carrying the hash instead, so accept both shapes.
+    if (typeof result === 'string') return { ok: true, serialized: result }
+    const asObject = result as { hash?: string; transactionHash?: string; serialized?: string }
+    return {
+      ok: true,
+      txHash: asObject.hash ?? asObject.transactionHash,
+      serialized: asObject.serialized,
+    }
   } catch (err) {
-    console.error('Failed to sign and send transaction:', err)
-    return null
+    return { ok: false, reason: err instanceof Error ? err.message : 'The transfer failed' }
   }
 }
 
-// Get current block height for HTLC timeout calculation
 export async function getHTLCTimeout(daysFromNow: number = 10): Promise<number> {
   try {
     const blockNumber = await getBlockNumber()
@@ -185,29 +229,6 @@ export async function getHTLCTimeout(daysFromNow: number = 10): Promise<number> 
   } catch (err) {
     console.error('Failed to calculate HTLC timeout:', err)
     return 0
-  }
-}
-
-// Claim HTLC funds with pre-image
-export async function claimHTLC(
-  htlcAddress: string,
-  preImage: string,
-) {
-  try {
-    // Build HTLC claim transaction
-    // The claim must include the correct pre-image hash
-    // Format: transaction to HTLC address with preImage as proof
-
-    const claimTx = {
-      to: htlcAddress,
-      data: preImage,
-      value: 0, // No value needed, just proof
-    }
-
-    return claimTx
-  } catch (err) {
-    console.error('Failed to build HTLC claim:', err)
-    return null
   }
 }
 

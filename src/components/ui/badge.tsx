@@ -32,20 +32,33 @@ const STATUS_TONES: Record<string, BadgeProps['tone']> = {
   pending: 'neutral',
   active: 'info',
   funded: 'info',
+  locked: 'info',
   submitted: 'violet',
   completed: 'success',
   approved: 'success',
   released: 'success',
   resolved: 'success',
   disputed: 'danger',
+  // "open" means two different things in this app — an opportunity taking
+  // proposals, and an unresolved dispute. The dispute reading is the default
+  // because it is the one that needs attention; the board passes `tone`.
   open: 'danger',
+  'under review': 'violet',
   cancelled: 'neutral',
   refunded: 'neutral',
 }
 
-export function StatusBadge({ status, className }: { status: string; className?: string }) {
+export function StatusBadge({
+  status,
+  tone,
+  className,
+}: {
+  status: string
+  tone?: BadgeProps['tone']
+  className?: string
+}) {
   return (
-    <Badge tone={STATUS_TONES[status] ?? 'neutral'} className={className}>
+    <Badge tone={tone ?? STATUS_TONES[status] ?? 'neutral'} className={className}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   )

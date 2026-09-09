@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySessionToken } from '@/lib/auth'
+import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+
+// Chat is private and it opens late: only the client and the freelancer they
+// accepted can post, and only once that acceptance has happened. Before then
+// the proposal is the whole conversation. Every message is kept — the mediator
+// reads this thread as evidence.
 
 export async function POST(request: NextRequest) {
   try {
-    const session = request.cookies.get('session')?.value
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await verifySessionToken(session)
+    const user = await requireSession(request)
     if (!user) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { agreementId, content } = await request.json()
@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
 
     if (agreement.buyerId !== user.userId && agreement.sellerId !== user.userId) {
       return NextResponse.json({ error: 'Not a party to this agreement' }, { status: 403 })
+    }
+
+    if (!agreement.sellerId) {
+      return NextResponse.json(
+        { error: 'The chat opens once a freelancer is accepted' },
+        { status: 400 },
+      )
     }
 
     const message = await prisma.message.create({
@@ -54,14 +61,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = request.cookies.get('session')?.value
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await verifySessionToken(session)
+    const user = await requireSession(request)
     if (!user) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const agreementId = request.nextUrl.searchParams.get('agreementId')
