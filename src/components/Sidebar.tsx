@@ -22,7 +22,7 @@ export default function Sidebar() {
   }
 
   return (
-    <nav className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-border bg-background px-3 py-4">
+    <nav className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col border-r border-border bg-background px-3 py-4 lg:flex">
       <Link href="/dashboard" className="mb-6 flex items-center gap-2 px-2">
         <div className="flex h-6 w-6 items-center justify-center rounded bg-accent">
           <Lock className="h-3.5 w-3.5 text-accent-foreground" strokeWidth={2.5} />

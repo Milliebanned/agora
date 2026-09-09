@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateAgreement, checkRiskFlags, isGeminiConfigured } from '@/lib/gemini'
+import { generateAgreement, isGeminiConfigured } from '@/lib/gemini'
 import { verifySessionToken } from '@/lib/auth'
+
+// Vercel defaults serverless functions to 10s, which a model call blows through
+// every time. 60s is the Hobby-plan ceiling.
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,24 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to generate agreement' }, { status: 500 })
     }
 
-    // Quick risk check
-    const allDetails = `
-Title: ${agreement.title}
-Scope: ${agreement.scope}
-Deliverables: ${agreement.deliverables.join(', ')}
-Timeline: ${agreement.timeline_days} days
-Amount: ${agreement.amount_nim} NIM
-Completion: ${agreement.completion_conditions}
-Refund: ${agreement.refund_conditions}
-`
-
-    const additionalRiskFlags = await checkRiskFlags(allDetails)
-    const allRiskFlags = [...(agreement.risk_flags || []), ...additionalRiskFlags]
-
-    return NextResponse.json({
-      ...agreement,
-      risk_flags: allRiskFlags,
-    })
+    return NextResponse.json(agreement)
   } catch (error) {
     console.error('Agreement generation error:', error)
     const detail = error instanceof Error ? error.message : String(error)

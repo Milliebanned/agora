@@ -12,10 +12,16 @@ export function PageHeader({
   action?: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 mb-8">
+    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div>
-        <h1 className="text-heading-sm font-medium text-foreground">{title}</h1>
-        {description && <p className="mt-1.5 text-[15px] text-muted-foreground">{description}</p>}
+        <h1 className="text-[26px] font-medium leading-tight tracking-heading text-foreground sm:text-heading-sm">
+          {title}
+        </h1>
+        {description && (
+          <p className="mt-1.5 text-[14px] leading-relaxed text-muted-foreground sm:text-[15px]">
+            {description}
+          </p>
+        )}
       </div>
       {action}
     </div>

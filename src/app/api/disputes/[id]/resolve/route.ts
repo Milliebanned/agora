@@ -4,6 +4,10 @@ import { generateMediatorVerdict, isGeminiConfigured } from '@/lib/gemini'
 import { formatDate, parseJsonArray } from '@/lib/utils'
 import prisma from '@/lib/db'
 
+// Same reason as the agreement builder: a model call blows past Vercel's 10s
+// default. 60s is the Hobby-plan ceiling.
+export const maxDuration = 60
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
