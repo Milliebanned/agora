@@ -105,7 +105,7 @@
 - [ ] Simulate dispute: click "Open Dispute"
 - [ ] Reason: "Work doesn't match specification"
 - [ ] Click "Get AI Verdict"
-- [ ] Show Claude Sonnet analyzing:
+- [ ] Show Gemini analyzing:
   - [ ] Case Summary
   - [ ] Findings (e.g., "Deliverable partially complete")
   - [ ] Recommended Outcome: "Release" / "Refund" / "Partial Refund"

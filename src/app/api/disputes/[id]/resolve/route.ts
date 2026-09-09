@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySessionToken } from '@/lib/auth'
-import { generateMediatorVerdict } from '@/lib/claude'
+import { generateMediatorVerdict, isGeminiConfigured } from '@/lib/gemini'
 import { formatDate, parseJsonArray } from '@/lib/utils'
 import prisma from '@/lib/db'
 
@@ -81,17 +81,13 @@ Opened By: ${dispute.opener.displayName}
 Against: ${dispute.respondent.displayName}
 `
 
-    // Generate verdict using Claude Sonnet
+    // Generate verdict using Gemini
     const verdict = await generateMediatorVerdict(
       agreementDetails + disputeContext,
       timeline,
       messages,
       submittedWork || 'No work submitted',
     )
-
-    if (!verdict) {
-      return NextResponse.json({ error: 'Failed to generate verdict' }, { status: 500 })
-    }
 
     // Update dispute with verdict
     const updated = await prisma.dispute.update({
@@ -120,7 +116,16 @@ Against: ${dispute.respondent.displayName}
 
     return NextResponse.json(updated)
   } catch (error) {
+    // The mediator is the headline feature, so a failure names its own cause
+    // rather than hiding behind "Internal server error".
     console.error('Resolve dispute error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const detail = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      {
+        error: isGeminiConfigured() ? 'AI mediation failed' : 'GEMINI_API_KEY is not set',
+        detail,
+      },
+      { status: 500 },
+    )
   }
 }

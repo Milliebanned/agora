@@ -36,13 +36,13 @@ JWT_SECRET=your-random-32-char-secret-key-here
 DATABASE_URL=postgresql://user:password@db.supabase.co/postgres
 
 # Anthropic Claude API
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=
 
 # HTLC Timeout (blocks, ~4 blocks per minute on Nimiq, 14400 = ~10 days)
 HTLC_TIMEOUT_BLOCKS=14400
 EOF
   echo "⚠️  Update .env.local with real credentials:"
-  echo "   - ANTHROPIC_API_KEY: get from console.anthropic.com"
+  echo "   - GEMINI_API_KEY: get from aistudio.google.com/apikey"
   echo "   - DATABASE_URL: create Supabase project, copy PostgreSQL URL"
   echo "   - JWT_SECRET: generate a random 32-char string"
   echo "   - Nimiq RPC endpoints: check nimiq.dev/mini-apps"

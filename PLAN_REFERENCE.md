@@ -19,7 +19,7 @@
 | **Database** | Supabase Postgres + Prisma | prisma/schema.prisma, src/lib/db.ts |
 | **Auth** | Wallet signing (no passwords) | src/lib/auth.ts, src/app/api/auth/ |
 | **Blockchain** | Nimiq SDK + HTLC | src/lib/nimiq.ts (⚠️ spike placeholders) |
-| **AI** | Claude Sonnet 5 + Haiku 4.5 | src/lib/claude.ts |
+| **AI** | Gemini 3.8 Flash + 3.5 Flash-Lite | src/lib/gemini.ts |
 | **Hosting** | Vercel + Supabase config | .env.example, SETUP_INSTRUCTIONS.md |
 
 ### Scope (Deep MVP from Plan)
@@ -29,12 +29,12 @@
 | Feature | Status | Implementation File(s) |
 |---------|--------|------------------------|
 | Wallet login (message signing) | ✅ Scaffolded | src/lib/auth.ts, src/app/login/page.tsx |
-| AI Agreement Builder | ✅ API ready | src/lib/claude.ts, src/app/api/ai/generate-agreement/route.ts |
+| AI Agreement Builder | ✅ API ready | src/lib/gemini.ts, src/app/api/ai/generate-agreement/route.ts |
 | Fund Escrow (HTLC creation) | ⚠️ Needs spike | src/lib/nimiq.ts (buildHTLCCreationTx + signAndSendTransaction placeholders) |
 | Milestone submit/approve | ✅ Schema ready | prisma/schema.prisma (Milestone model), API stubs needed |
 | HTLC claim path (fund release) | ⚠️ Needs spike | src/lib/nimiq.ts placeholder |
 | Reputation update | ✅ Schema ready | prisma/schema.prisma (ReputationScore model), calc function in src/lib/utils.ts |
-| Dispute + AI Mediator | ✅ API ready | src/lib/claude.ts, src/app/api/disputes/[id]/resolve/route.ts |
+| Dispute + AI Mediator | ✅ API ready | src/lib/gemini.ts, src/app/api/disputes/[id]/resolve/route.ts |
 | Minimal messaging | ✅ Schema ready | prisma/schema.prisma (Message model), UI not yet built |
 | Dashboard (active/pending/disputed/balance/score) | ✅ Skeleton | src/app/dashboard/page.tsx (basic display), full build needed |
 
@@ -77,7 +77,7 @@ export async function signAndSendTransaction(txData: any) {
 | `src/lib/types.ts` | TypeScript interfaces for all entities | ✅ Complete | Use these everywhere for type safety |
 | `src/lib/db.ts` | Prisma client singleton | ✅ Complete | Import as `import prisma from '@/lib/db'` |
 | `src/lib/nimiq.ts` | Nimiq SDK integration | ⚠️ Needs spike | HTLC methods are placeholders |
-| `src/lib/claude.ts` | Claude API clients (Sonnet + Haiku) | ✅ Ready | Use for agreement generation, mediation, chat |
+| `src/lib/gemini.ts` | Gemini API client (reasoning + fast) | ✅ Ready | Use for agreement generation, mediation, chat |
 | `src/lib/auth.ts` | JWT + wallet challenge | ✅ Ready | Use for session management |
 | `src/lib/utils.ts` | Helper functions | ✅ Ready | Trust score calc, NIM formatting, hashing |
 
@@ -268,9 +268,9 @@ export async function signAndSendTransaction(txData: any) {
 - Use Prisma Studio (`npx prisma studio`) to test queries visually
 
 ### Claude API Usage
-- Sonnet 5: agreement generation, risk analysis, dispute mediation (use structured output with tool use)
-- Haiku 4.5: AI assistant chat, quick risk checks
-- One API key, two client instances (getSonnetClient(), getHaikuClient())
+- Gemini 3.8 Flash: agreement generation, dispute mediation (structured output via response_format schema)
+- Gemini 3.5 Flash-Lite: AI assistant chat, quick risk checks
+- One API key, one client; model tier picked per call and overridable via GEMINI_REASONING_MODEL / GEMINI_FAST_MODEL
 
 ### HTLC is Mainnet-Ready (Testnet First)
 - Write code once, test on testnet (just swap RPC endpoint in .env)

@@ -19,7 +19,7 @@ npm install
 cp .env.example .env.local
 
 # 3. Update .env.local with real credentials:
-#    - ANTHROPIC_API_KEY from console.anthropic.com
+#    - GEMINI_API_KEY from aistudio.google.com/apikey
 #    - DATABASE_URL from Supabase PostgreSQL connection
 #    - Nimiq RPC endpoints from nimiq.dev/mini-apps
 
@@ -38,12 +38,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **Database:** Supabase Postgres + Prisma ORM
 - **Auth:** Wallet-based (message signing)
 - **Blockchain:** Nimiq SDK + HTLC escrow
-- **AI:** Anthropic Claude (Sonnet 5 + Haiku 4.5)
+- **AI:** Google Gemini (3.8 Flash for reasoning, 3.5 Flash-Lite for fast passes)
 - **Hosting:** Vercel + Supabase
 
 ## Key Features
 
-1. **AI Agreement Builder** — Type in natural language; Claude Sonnet generates a full structured contract.
+1. **AI Agreement Builder** — Type in natural language; Gemini generates a full structured contract.
 2. **HTLC Escrow** — Native Nimiq Hashed Time-Locked Contracts for secure fund holding.
 3. **Reputation System** — Trust scores based on agreement completion and dispute history.
 4. **AI Dispute Mediator** — Claude reviews disputes and produces a verdict.
@@ -63,7 +63,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 See `.env.example` for full list. Critical ones:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...         # Claude API key
+GEMINI_API_KEY=...                   # Google Gemini API key
 DATABASE_URL=postgresql://...         # Supabase PostgreSQL
 NIMIQ_RPC_ENDPOINT=...               # Testnet RPC (for testing)
 NIMIQ_MAINNET_RPC_ENDPOINT=...       # Mainnet RPC (for production)
@@ -125,7 +125,7 @@ See [miniappscompetition.com](https://miniappscompetition.com) for full rules.
 
 - See `CLAUDE.md` for detailed architecture, decisions, and Claude API patterns.
 - Nimiq developer docs: [nimiq.dev/mini-apps](https://nimiq.dev/mini-apps)
-- Anthropic Claude docs: [docs.anthropic.com](https://docs.anthropic.com)
+- Gemini API docs: [ai.google.dev/gemini-api/docs](https://ai.google.dev/gemini-api/docs)
 
 ---
 

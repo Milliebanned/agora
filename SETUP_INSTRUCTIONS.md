@@ -6,7 +6,7 @@
 - npm (included with Node.js)
 - GitHub account (to create a public repo)
 - Supabase account (free tier: [supabase.com](https://supabase.com))
-- Anthropic API key (free tier: [console.anthropic.com](https://console.anthropic.com))
+- Google Gemini API key (free tier: [aistudio.google.com/apikey](https://aistudio.google.com/apikey))
 
 ## Quick Start (5 minutes)
 
@@ -28,9 +28,9 @@ cp .env.example .env.local
 Edit `.env.local` and fill in:
 
 #### Anthropic API Key
-1. Go to [console.anthropic.com](https://console.anthropic.com)
+1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 2. Generate an API key
-3. Paste into `ANTHROPIC_API_KEY=sk-ant-...`
+3. Paste into `GEMINI_API_KEY=...`
 
 #### Supabase Database
 1. Go to [supabase.com](https://supabase.com), sign up / log in
@@ -114,7 +114,7 @@ git commit -m "Initial NimTrust scaffold with Next.js, Prisma, Nimiq SDK, and Cl
 - Project structure (app router, API routes, lib utilities)
 - Authentication (wallet login via message signing)
 - Database schema (users, agreements, escrow, disputes, messages)
-- Claude AI integration (Sonnet for generation/mediation, Haiku for chat/flags)
+- Gemini AI integration (3.8 Flash for generation/mediation, 3.5 Flash-Lite for chat/flags)
 - Core API stubs (auth, agreements, disputes, AI)
 - Day 1 spike task: validate HTLC transaction-signing method
 
@@ -132,11 +132,11 @@ git push -u origin main
 
 1. **Validate HTLC SDK method** (Day 1 spike)
 2. **Build Agreement CRUD API** → test in dashboard
-3. **Implement AI Agreement Builder** → call Claude Sonnet
+3. **Implement AI Agreement Builder** → call Gemini
 4. **Fund Escrow** → HTLC creation transaction (after spike)
 5. **Milestone submit/approve** → HTLC claim path
 6. **Reputation system** → trust score calculation
-7. **Disputes + AI Mediator** → Sonnet verdict
+7. **Disputes + AI Mediator** → Gemini verdict
 8. **UI Polish** → test on actual Nimiq Pay app
 
 ## Troubleshooting
@@ -174,6 +174,6 @@ git push -u origin main
 ## Need Help?
 
 - Nimiq docs: [nimiq.dev](https://nimiq.dev)
-- Claude API: [docs.anthropic.com](https://docs.anthropic.com)
+- Gemini API: [ai.google.dev/gemini-api/docs](https://ai.google.dev/gemini-api/docs)
 - Supabase: [supabase.com/docs](https://supabase.com/docs)
 - Next.js: [nextjs.org](https://nextjs.org)
