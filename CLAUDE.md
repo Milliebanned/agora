@@ -69,6 +69,7 @@ Use structured output via tool use / JSON schema for agreement & mediation.
 ### All Features Implemented
 
 ✅ Wallet login (message signing, no passwords)  
+✅ Role onboarding (offer a service vs. require a service, switchable in profile)  
 ✅ AI Agreement Builder (Claude Sonnet generates contracts)  
 ✅ Agreement CRUD (create, read, update, filter by status)  
 ✅ Milestone management (create, submit, approve)  
@@ -129,7 +130,7 @@ src/
 ## Demo Flow
 
 1. Connect wallet in Nimiq Pay.
-2. Sign message → dashboard.
+2. Sign message → choose a marketplace side (offer a service / need a service) → dashboard.
 3. "Create Agreement" → type "Build landing page for $500 in 7 days."
 4. AI generates full contract; user confirms.
 5. Fund escrow (sign HTLC tx).

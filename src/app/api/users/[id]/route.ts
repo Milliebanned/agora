@@ -27,6 +27,7 @@ export async function GET(
       address: user.address,
       displayName: user.displayName,
       bio: user.bio,
+      role: user.role,
       createdAt: user.createdAt,
       reputation: {
         totalAgreements: rep?.totalAgreements ?? 0,

@@ -1,10 +1,15 @@
 // Shared TypeScript interfaces for NimTrust
 
+// Which side of the marketplace a user is on. Chosen right after wallet
+// connect and stored on the profile; null means the choice is still pending.
+export type UserRole = 'provider' | 'client'
+
 export interface User {
   id: string
   address: string
   displayName?: string
   bio?: string
+  role?: UserRole | null
   createdAt: Date
   updatedAt: Date
 }

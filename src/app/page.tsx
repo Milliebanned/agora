@@ -50,10 +50,17 @@ const STEPS = [
 export default function Home() {
   const { connectWallet, loading, error } = useWalletLogin()
   const [signedIn, setSignedIn] = useState(false)
+  // A returning wallet that never picked a side resumes at /onboarding.
+  const [resumeHref, setResumeHref] = useState('/dashboard')
 
   useEffect(() => {
     fetch('/api/auth/session', { credentials: 'include' })
-      .then((res) => setSignedIn(res.ok))
+      .then(async (res) => {
+        setSignedIn(res.ok)
+        if (!res.ok) return
+        const { user } = await res.json()
+        setResumeHref(user?.role ? '/dashboard' : '/onboarding')
+      })
       .catch(() => setSignedIn(false))
   }, [])
 
@@ -72,7 +79,7 @@ export default function Home() {
               Nimiq Pay Mini App
             </span>
             {signedIn ? (
-              <Link href="/dashboard">
+              <Link href={resumeHref}>
                 <Button size="sm">Open dashboard</Button>
               </Link>
             ) : (
@@ -112,7 +119,7 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 {signedIn ? (
-                  <Link href="/dashboard">
+                  <Link href={resumeHref}>
                     <Button size="lg">
                       Open dashboard
                       <ArrowRight className="h-4 w-4" />
@@ -246,7 +253,7 @@ export default function Home() {
               Make your next deal trustless.
             </h2>
             {signedIn ? (
-              <Link href="/dashboard">
+              <Link href={resumeHref}>
                 <Button size="lg">Open dashboard</Button>
               </Link>
             ) : (

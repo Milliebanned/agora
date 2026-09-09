@@ -68,7 +68,10 @@ export function useWalletLogin() {
         return
       }
 
-      router.push('/dashboard')
+      // A wallet that has never picked a marketplace side lands on /onboarding
+      // to choose between offering and requiring a service.
+      const { user } = await verifyRes.json().catch(() => ({ user: null }))
+      router.push(user?.role ? '/dashboard' : '/onboarding')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       setLoading(false)
