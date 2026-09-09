@@ -151,7 +151,7 @@ Be concrete and even-handed. Split the work into milestones that can each be
 judged done or not done. If the request leaves the amount or the timeline
 unstated, choose a reasonable figure and flag the assumption in risk_flags.`,
     AGREEMENT_SCHEMA,
-    { maxOutputTokens: 4000, thinkingLevel: 'medium' },
+    { maxOutputTokens: 2500, thinkingLevel: 'low' },
   )
 }
 
@@ -186,7 +186,7 @@ ${messages}
 === SUBMITTED WORK ===
 ${submittedWork}`,
     VERDICT_SCHEMA,
-    { maxOutputTokens: 4000, thinkingLevel: 'high' },
+    { maxOutputTokens: 1800, thinkingLevel: 'low' },
   )
 }
 

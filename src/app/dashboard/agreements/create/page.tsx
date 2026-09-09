@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -29,24 +29,56 @@ export default function CreateAgreementPage() {
   const [generated, setGenerated] = useState<GeneratedAgreement | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [elapsed, setElapsed] = useState(0)
+
+  // Drafting runs anywhere from 7s to a minute depending on how busy the model
+  // is, so the button shows a running count rather than an inert spinner.
+  useEffect(() => {
+    if (!loading) return
+    setElapsed(0)
+    const id = setInterval(() => setElapsed((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [loading])
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+
+    // Without this the request can hang forever inside the Nimiq Pay WebView,
+    // which reads as "stuck loading" with nothing to act on.
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 70000)
+
     try {
       const res = await fetch('/api/ai/generate-agreement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userRequest: userInput }),
         credentials: 'include',
+        signal: controller.signal,
       })
-      if (!res.ok) throw new Error('Could not generate the agreement. Check the AI API key is set.')
+
+      if (!res.ok) {
+        // Report what the server actually said instead of guessing at the cause.
+        const body = await res.json().catch(() => null)
+        throw new Error(
+          body?.error
+            ? `${body.error}${body.detail ? ` — ${String(body.detail).slice(0, 200)}` : ''}`
+            : `Agreement generation failed (${res.status})`,
+        )
+      }
+
       setGenerated(await res.json())
       setStep('review')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('The model took too long to respond. Tap Generate to try again.')
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      }
     } finally {
+      clearTimeout(timeout)
       setLoading(false)
     }
   }
@@ -101,7 +133,7 @@ export default function CreateAgreementPage() {
           Back to description
         </button>
 
-        <PageHeader title="Review agreement" description="Drafted by Claude from your description." />
+        <PageHeader title="Review agreement" description="Drafted by AI from your description." />
 
         <Card>
           <div className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
@@ -211,7 +243,7 @@ export default function CreateAgreementPage() {
     <>
       <PageHeader
         title="New agreement"
-        description="Describe the deal in plain English. Claude turns it into a structured contract."
+        description="Describe the deal in plain English. AI turns it into a structured contract."
       />
 
       <Card>
@@ -238,9 +270,11 @@ export default function CreateAgreementPage() {
           <div className="mt-5 flex items-center gap-3">
             <Button type="submit" disabled={loading || !userInput.trim()}>
               {loading ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-              {loading ? 'Drafting' : 'Generate agreement'}
+              {loading ? `Drafting… ${elapsed}s` : 'Generate agreement'}
             </Button>
-            <span className="text-[12px] text-subtle-foreground">Takes a few seconds</span>
+            <span className="text-[12px] text-subtle-foreground">
+              {loading ? 'Can take up to a minute' : 'Usually under a minute'}
+            </span>
           </div>
 
           {error && <p className="mt-4 text-[13px] text-destructive">{error}</p>}
