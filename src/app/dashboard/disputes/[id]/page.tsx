@@ -78,8 +78,16 @@ export default function DisputeDetailPage() {
         method: 'POST',
         credentials: 'include',
       })
-      if (!res.ok) throw new Error('Could not generate a verdict. Check the AI API key is set.')
-      setDispute(await res.json())
+      const data = await res.json().catch(() => null)
+      // The resolve route is written to name its own cause — a missing API key,
+      // a rate limit, a model that returned nothing. Replacing all of that with
+      // one guess sent us looking at an API key that was never the problem.
+      if (!res.ok) {
+        throw new Error(
+          data?.detail ? `${data.error} — ${data.detail}` : (data?.error ?? `Request failed (${res.status})`),
+        )
+      }
+      setDispute(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {

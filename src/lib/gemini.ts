@@ -74,37 +74,101 @@ const RISK_FLAGS_SCHEMA = {
   required: ['flags'],
 }
 
+// Failures worth trying again: the model was busy, rate-limited, or the
+// connection died. A bad request or a missing key will fail identically every
+// time, and retrying those just makes the user wait longer to read the same
+// message.
+function isTransient(err: unknown): boolean {
+  const status = (err as { status?: number; code?: number } | null)?.status ??
+    (err as { code?: number } | null)?.code
+  if (typeof status === 'number') {
+    return status === 429 || status === 408 || (status >= 500 && status < 600)
+  }
+  const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
+  return /429|rate.?limit|quota|timeout|timed out|overloaded|unavailable|503|502|504|econnreset|socket hang up|fetch failed/.test(
+    message,
+  )
+}
+
 // One place where a schema-constrained call is made and its JSON read back.
+//
+// Retried on transient failures, because the first call after a quiet period is
+// the one most likely to hit a cold connection or a burst limit, and a mediator
+// that works only on the second click reads as a broken mediator.
 async function generateJson<T>(
   model: string,
   prompt: string,
   schema: Record<string, unknown>,
-  opts: { maxOutputTokens: number; thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high' },
+  opts: {
+    maxOutputTokens: number
+    thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high'
+    attempts?: number
+    /** Stop starting new attempts past this many ms. Must sit inside the
+     *  route's maxDuration, or the retry itself becomes the timeout. */
+    budgetMs?: number
+  },
 ): Promise<T> {
-  const interaction = await getGeminiClient().interactions.create({
-    model,
-    input: prompt,
-    response_format: {
-      type: 'text',
-      mime_type: 'application/json',
-      schema,
-    },
-    generation_config: {
-      max_output_tokens: opts.maxOutputTokens,
-      ...(opts.thinkingLevel ? { thinking_level: opts.thinkingLevel } : {}),
-    },
-  })
+  const attempts = opts.attempts ?? 3
+  const budgetMs = opts.budgetMs ?? 45_000
+  const startedAt = Date.now()
+  let lastError: unknown
 
-  const text = interaction.output_text
-  if (!text) {
-    throw new Error(`Gemini (${model}) returned no text output`)
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const interaction = await getGeminiClient().interactions.create({
+        model,
+        input: prompt,
+        response_format: {
+          type: 'text',
+          mime_type: 'application/json',
+          schema,
+        },
+        generation_config: {
+          max_output_tokens: opts.maxOutputTokens,
+          ...(opts.thinkingLevel ? { thinking_level: opts.thinkingLevel } : {}),
+        },
+      })
+
+      const text = interaction.output_text
+      // An empty completion is a transient failure wearing a success's clothes —
+      // usually a truncated or filtered response — so it is retried rather than
+      // reported as though the model had nothing to say.
+      if (!text) throw new Error(`Gemini (${model}) returned no text output`)
+
+      try {
+        return JSON.parse(text) as T
+      } catch {
+        // The schema is enforced server-side, so unparseable output means a
+        // truncated stream rather than a model that ignored instructions.
+        throw new Error(`Gemini (${model}) returned unparseable JSON: ${text.slice(0, 300)}`)
+      }
+    } catch (err) {
+      lastError = err
+      const retryable = isTransient(err) || /returned no text output|unparseable JSON/.test(
+        err instanceof Error ? err.message : '',
+      )
+      if (!retryable || attempt === attempts) break
+
+      // Retrying into a request that is about to be killed anyway just replaces
+      // a readable error with a gateway timeout.
+      const elapsed = Date.now() - startedAt
+      if (elapsed > budgetMs) {
+        console.warn(`[gemini] ${model} out of retry budget after ${elapsed}ms — surfacing the error`)
+        break
+      }
+
+      // Back off a little between tries; a burst limit clears in about a second.
+      const waitMs = 700 * attempt
+      console.warn(
+        `[gemini] ${model} attempt ${attempt}/${attempts} failed (${
+          err instanceof Error ? err.message : String(err)
+        }) — retrying in ${waitMs}ms`,
+      )
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+    }
   }
 
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    throw new Error(`Gemini (${model}) returned unparseable JSON: ${text.slice(0, 300)}`)
-  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError))
 }
 
 // The AI mediator: review a stalled deal and issue a reasoned verdict.
@@ -149,7 +213,9 @@ ${messages}
 === SUBMITTED WORK ===
 ${submittedWork}`,
     VERDICT_SCHEMA,
-    { maxOutputTokens: 1800, thinkingLevel: 'low' },
+    // Two attempts, not three: a mediation call with a thinking budget is slow
+    // enough that a third would outlive the route.
+    { maxOutputTokens: 1800, thinkingLevel: 'low', attempts: 2, budgetMs: 30_000 },
   )
 }
 
