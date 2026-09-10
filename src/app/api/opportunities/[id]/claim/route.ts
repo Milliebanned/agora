@@ -136,9 +136,13 @@ export async function POST(
           sameAddress(tx.to, recipientAddress) &&
           Math.abs(tx.value / 1e5 - amountNIM) < 0.00001 &&
           // Only a transfer made since this deal was approved can be its payout.
+          // tx.timestamp is normalised to milliseconds by the RPC layer; it was
+          // multiplied by 1000 here on the assumption it was seconds, which made
+          // this test always true and let an older payout of the same amount to
+          // the same freelancer be mistaken for this deal's.
           (!tx.timestamp ||
             !opportunity.completedAt ||
-            tx.timestamp * 1000 >= opportunity.completedAt.getTime() - 60_000),
+            tx.timestamp >= opportunity.completedAt.getTime() - 60_000),
       )
       if (already) {
         await prisma.escrowTransaction.update({
