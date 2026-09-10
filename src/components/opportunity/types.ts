@@ -70,5 +70,6 @@ export interface OpportunityDetail {
   escrowTransactions: EscrowTxRow[]
   disputes: Array<{ id: string; status: string; createdAt: string }>
   preImageAvailable: boolean
-  viewer: { id: string; isClient: boolean; isFreelancer: boolean; isParty: boolean }
+  viewer: { id: string; isClient: boolean; isFreelancer: boolean; isParty: boolean
+    isMediator?: boolean }
 }

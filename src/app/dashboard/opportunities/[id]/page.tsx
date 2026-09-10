@@ -78,11 +78,22 @@ export default function OpportunityDetailPage() {
   const deliverables = parseJsonArray(opportunity.deliverables)
   const attachments = parseAttachments(opportunity.attachments)
   const budget = Number(opportunity.budgetNIM ?? opportunity.amountNIM)
-  const { isParty, isClient } = opportunity.viewer
+  const { isParty, isClient, isMediator } = opportunity.viewer
   const engaged = isEngaged(opportunity.status) || opportunity.status === 'completed'
 
   return (
     <>
+
+      {isMediator && !isParty && (
+        <div className="mb-4 rounded-md border border-accent/25 bg-accent/[0.06] px-4 py-3">
+          <p className="text-[13px] font-medium text-accent">Viewing as mediator</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-secondary-foreground">
+            You can see this deal because a dispute on it was referred to a human. Read the
+            requirements, the submitted work and the chat, then rule from the dispute page. You
+            cannot act on the deal itself.
+          </p>
+        </div>
+      )}
       <Link
         href="/dashboard/opportunities"
         className="mb-6 flex w-fit items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
@@ -221,7 +232,7 @@ export default function OpportunityDetailPage() {
           </Card>
 
           {/* Proposals matter until someone is chosen; after that the work does. */}
-          {engaged && isParty ? (
+          {engaged && (isParty || isMediator) ? (
             <WorkPanel
               opportunity={opportunity}
               onChanged={load}
@@ -237,7 +248,7 @@ export default function OpportunityDetailPage() {
             />
           )}
 
-          {isParty && <ChatPanel opportunity={opportunity} />}
+          {(isParty || isMediator) && <ChatPanel opportunity={opportunity} />}
         </div>
 
         <div className="space-y-3">
