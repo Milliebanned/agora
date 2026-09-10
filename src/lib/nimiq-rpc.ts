@@ -47,7 +47,25 @@ export interface ChainTransaction {
   value: number // luna
   blockNumber?: number
   confirmations?: number
+  /** Unix milliseconds. Normalised — see normaliseTx. */
   timestamp?: number
+}
+
+// Albatross nodes report transaction timestamps in milliseconds, but the field
+// is bare `timestamp` and reads like seconds, which is how it came to be
+// multiplied by 1000 at a call site and land in the year 58663. A comparison
+// against that is not merely wrong, it is uselessly true, which silently
+// disabled a guard on the payout path.
+//
+// Normalise once, here, so no caller has to know: anything below ~2001 in
+// milliseconds must have been seconds.
+const MS_THRESHOLD = 1e12
+
+function normaliseTx<T extends { timestamp?: number }>(tx: T): T {
+  if (typeof tx.timestamp === 'number' && tx.timestamp > 0 && tx.timestamp < MS_THRESHOLD) {
+    return { ...tx, timestamp: tx.timestamp * 1000 }
+  }
+  return tx
 }
 
 export async function getBlockNumber(): Promise<number> {
@@ -70,7 +88,8 @@ export async function getAccountByAddress(address: string): Promise<ChainAccount
 
 export async function getTransactionByHash(hash: string): Promise<ChainTransaction | null> {
   try {
-    return await rpc<ChainTransaction>('getTransactionByHash', [hash])
+    const tx = await rpc<ChainTransaction>('getTransactionByHash', [hash])
+    return tx ? normaliseTx(tx) : null
   } catch (err) {
     // A hash the node has not seen yet is a normal state right after a send,
     // not a failure worth throwing over.
@@ -87,7 +106,8 @@ export async function getTransactionsByAddress(
   address: string,
   max = 20,
 ): Promise<ChainTransaction[]> {
-  return (await rpc<ChainTransaction[]>('getTransactionsByAddress', [address, max, null])) ?? []
+  const txs = (await rpc<ChainTransaction[]>('getTransactionsByAddress', [address, max, null])) ?? []
+  return txs.map(normaliseTx)
 }
 
 // Wait for a transaction the node has not indexed yet.
