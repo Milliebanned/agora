@@ -61,7 +61,17 @@ export async function POST(
         { status: 409 },
       )
     }
-    if (dispute.openerAccepted || dispute.respondentAccepted) {
+    // A verdict somebody has already accepted must not be quietly replaced —
+    // that would let the party who dislikes it roll the dice again and discard
+    // the other side's acceptance without their knowing.
+    //
+    // A *rejected* verdict is the opposite case: it is dead, both sides know it,
+    // and asking again is the intended way forward. Both answers reset, so an
+    // earlier acceptance is never carried silently onto a different verdict.
+    const rejected =
+      dispute.openerDecision === 'rejected' || dispute.respondentDecision === 'rejected'
+
+    if (!rejected && (dispute.openerDecision || dispute.respondentDecision)) {
       return NextResponse.json(
         { error: 'A verdict is already on the table and has been accepted by one party.' },
         { status: 409 },
@@ -168,6 +178,9 @@ Their reason: ${dispute.reason}
         findings: verdict.findings,
         recommendedOutcome: verdict.recommended_outcome,
         freelancerPercent: percent,
+        // A new verdict is a new question. Nobody has answered it yet.
+        openerDecision: null,
+        respondentDecision: null,
       },
       include: {
         opener: { select: { displayName: true, id: true } },

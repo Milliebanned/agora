@@ -56,6 +56,9 @@ export async function POST(
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
     }
 
+    const body = await request.json().catch(() => ({}) as { decision?: string })
+    const decision = (body as { decision?: string }).decision === 'reject' ? 'rejected' : 'accepted'
+
     if (dispute.status === 'resolved') {
       return NextResponse.json({ error: 'This dispute is already settled.' }, { status: 409 })
     }
@@ -87,22 +90,55 @@ export async function POST(
       )
     }
 
-    // Record this party's acceptance. Conditional on it still being false, so
-    // two clicks from the same person cannot both count as "the second one".
-    const field = isOpener ? 'openerAccepted' : 'respondentAccepted'
+    // Record this party's answer. Conditional on it still being unset, so two
+    // clicks from the same person cannot both count as "the second one".
+    const field = isOpener ? 'openerDecision' : 'respondentDecision'
     if (!dispute[field]) {
       await prisma.dispute.updateMany({
-        where: { id, [field]: false },
-        data: { [field]: true },
+        where: { id, [field]: null },
+        data: { [field]: decision },
       })
     }
 
     const after = await prisma.dispute.findUniqueOrThrow({ where: { id } })
-    if (!after.openerAccepted || !after.respondentAccepted) {
+
+    // A rejection ends this verdict. It does not end the dispute, and it moves
+    // no money: the escrow stays exactly where it is. What it ends is the
+    // pretence that the model settled anything — the parties either produce
+    // more evidence and ask for a fresh verdict, or resolve it between
+    // themselves.
+    if (after.openerDecision === 'rejected' || after.respondentDecision === 'rejected') {
+      const rejecter = after.openerDecision === 'rejected' ? dispute.openerId : dispute.respondentId
+
+      await prisma.$transaction([
+        prisma.dispute.update({ where: { id }, data: { status: 'escalated' } }),
+        prisma.message.create({
+          data: {
+            agreementId: opportunity.id,
+            senderId: rejecter,
+            type: 'system',
+            content:
+              'The mediator’s verdict was rejected, so it is not binding and no funds have moved. ' +
+              'Add anything the mediator did not see to this chat and request a fresh verdict, or agree an outcome between yourselves.',
+          },
+        }),
+      ])
+
+      return NextResponse.json({
+        message:
+          'Your rejection is recorded. The verdict is not binding and the escrow has not moved. You can add evidence here and request a fresh verdict.',
+        settled: false,
+        rejected: true,
+        openerDecision: after.openerDecision,
+        respondentDecision: after.respondentDecision,
+      })
+    }
+
+    if (after.openerDecision !== 'accepted' || after.respondentDecision !== 'accepted') {
       return NextResponse.json({
         message: 'Your acceptance is recorded. The verdict takes effect once the other party accepts too.',
-        openerAccepted: after.openerAccepted,
-        respondentAccepted: after.respondentAccepted,
+        openerDecision: after.openerDecision,
+        respondentDecision: after.respondentDecision,
         settled: false,
       })
     }

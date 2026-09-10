@@ -3,7 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Scale, ArrowUpRight, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
+import {
+  ArrowLeft,
+  Scale,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  XCircle,
+} from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -18,8 +26,8 @@ interface Dispute {
   findings?: string
   recommendedOutcome?: string
   freelancerPercent?: number
-  openerAccepted: boolean
-  respondentAccepted: boolean
+  openerDecision: string | null
+  respondentDecision: string | null
   amountNIM: number
   viewerRole: 'client' | 'freelancer'
   createdAt: string
@@ -43,7 +51,7 @@ export default function DisputeDetailPage() {
   const [dispute, setDispute] = useState<Dispute | null>(null)
   const [loading, setLoading] = useState(true)
   const [mediating, setMediating] = useState(false)
-  const [accepting, setAccepting] = useState(false)
+  const [accepting, setAccepting] = useState<'accept' | 'reject' | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [user, setUser] = useState<{ id: string } | null>(null)
@@ -95,18 +103,20 @@ export default function DisputeDetailPage() {
     }
   }
 
-  const handleAccept = async () => {
-    setAccepting(true)
+  const handleDecision = async (decision: 'accept' | 'reject') => {
+    setAccepting(decision)
     setError('')
     setNotice('')
     try {
       const res = await fetch(`/api/disputes/${disputeId}/settle`, {
         method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
       })
       const data = await res.json()
       if (res.ok) setNotice(data.message)
-      else setError(data.error ?? 'The verdict could not be accepted.')
+      else setError(data.error ?? 'Your answer could not be recorded.')
 
       // Re-read either way. If both parties accepted at the same moment one of
       // them is told a payout is already in progress — which is true, and the
@@ -124,7 +134,7 @@ export default function DisputeDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
-      setAccepting(false)
+      setAccepting(null)
     }
   }
 
@@ -134,8 +144,11 @@ export default function DisputeDetailPage() {
   const isOpener = user?.id === dispute.opener.id
   const isRespondent = user?.id === dispute.respondent.id
   const isParty = isOpener || isRespondent
-  const viewerAccepted = isOpener ? dispute.openerAccepted : dispute.respondentAccepted
-  const hasVerdict = dispute.status === 'under_review' || dispute.status === 'resolved'
+  const viewerDecision = isOpener ? dispute.openerDecision : dispute.respondentDecision
+  const wasRejected =
+    dispute.openerDecision === 'rejected' || dispute.respondentDecision === 'rejected'
+  const hasVerdict =
+    dispute.status === 'under_review' || dispute.status === 'resolved' || dispute.status === 'escalated'
 
   // Shown to both sides in NIM as well as percent: a split reads very
   // differently as "60%" than as "the 300 NIM you are not getting".
@@ -296,12 +309,14 @@ export default function DisputeDetailPage() {
 
                 <div className="mt-4 space-y-2">
                   {[
-                    [dispute.opener.displayName, dispute.openerAccepted, isOpener],
-                    [dispute.respondent.displayName, dispute.respondentAccepted, isRespondent],
-                  ].map(([name, accepted, isYou]) => (
+                    [dispute.opener.displayName, dispute.openerDecision, isOpener],
+                    [dispute.respondent.displayName, dispute.respondentDecision, isRespondent],
+                  ].map(([name, answer, isYou]) => (
                     <div key={name as string} className="flex items-center gap-2 text-[13px]">
-                      {accepted ? (
+                      {answer === 'accepted' ? (
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
+                      ) : answer === 'rejected' ? (
+                        <XCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />
                       ) : (
                         <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       )}
@@ -309,23 +324,75 @@ export default function DisputeDetailPage() {
                         {isYou ? 'You' : (name as string)}
                       </span>
                       <span className="text-muted-foreground">
-                        {accepted ? 'accepted' : 'has not accepted yet'}
+                        {answer === 'accepted'
+                          ? 'accepted'
+                          : answer === 'rejected'
+                            ? 'rejected the verdict'
+                            : 'has not answered yet'}
                       </span>
                     </div>
                   ))}
                 </div>
 
-                {viewerAccepted ? (
+                {viewerDecision === 'accepted' ? (
                   <p className="mt-4 text-[13px] text-muted-foreground">
                     You have accepted. Waiting on the other party.
                   </p>
                 ) : (
                   isParty && (
-                    <Button className="mt-4" onClick={handleAccept} disabled={accepting}>
-                      {accepting ? <Spinner className="h-4 w-4" /> : <Scale className="h-4 w-4" />}
-                      {accepting ? 'Recording your acceptance' : 'Accept this verdict'}
-                    </Button>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => handleDecision('accept')}
+                        disabled={accepting !== null}
+                      >
+                        {accepting === 'accept' ? (
+                          <Spinner className="h-4 w-4" />
+                        ) : (
+                          <Scale className="h-4 w-4" />
+                        )}
+                        {accepting === 'accept' ? 'Recording' : 'Accept this verdict'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleDecision('reject')}
+                        disabled={accepting !== null}
+                      >
+                        {accepting === 'reject' ? (
+                          <Spinner className="h-4 w-4" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                        {accepting === 'reject' ? 'Recording' : 'Reject'}
+                      </Button>
+                    </div>
                   )
+                )}
+                <p className="mt-3 text-[12px] leading-relaxed text-subtle-foreground">
+                  Rejecting moves no money and does not end the dispute. It ends this verdict — you
+                  can then add what the mediator missed to the deal chat and request a fresh one.
+                </p>
+              </div>
+            )}
+
+            {dispute.status === 'escalated' && (
+              <div className="rounded-md border border-destructive/25 bg-destructive/[0.06] p-4">
+                <div className="flex gap-2.5">
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <div>
+                    <p className="text-[13px] font-medium text-destructive">Verdict rejected</p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-secondary-foreground">
+                      This verdict is not binding and <span className="font-medium">no funds have
+                      moved</span> — the escrow is still held. Add whatever the mediator did not see
+                      to the deal chat, then request a fresh verdict. Both of you will be asked
+                      again from scratch.
+                    </p>
+                  </div>
+                </div>
+                {isParty && (
+                  <Button className="mt-4" onClick={handleGetVerdict} disabled={mediating}>
+                    {mediating ? <Spinner className="h-4 w-4" /> : <Scale className="h-4 w-4" />}
+                    {mediating ? 'Reviewing the case again' : 'Request a fresh verdict'}
+                  </Button>
                 )}
               </div>
             )}

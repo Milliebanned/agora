@@ -217,11 +217,15 @@ model Dispute {
   // findings the parties read can never drift apart.
   freelancerPercent Int?
 
-  // A verdict is a recommendation until both sides take it. Neither the model
-  // nor the platform can move money on its own — these two booleans are the
-  // only thing that authorises a settlement payout.
-  openerAccepted     Boolean @default(false)
-  respondentAccepted Boolean @default(false)
+  // A verdict is a recommendation until both sides answer it. Neither the model
+  // nor the platform can move money on its own: only two "accepted" here
+  // authorise a settlement payout.
+  //
+  // Three states, not a boolean, because "has not looked yet" and "refuses" are
+  // different facts and the other party deserves to know which they are waiting
+  // on. null = undecided, "accepted", "rejected".
+  openerDecision     String?
+  respondentDecision String?
 
   createdAt         DateTime @default(now())
   resolvedAt        DateTime?
