@@ -23,6 +23,18 @@ The rules — only after approval, only to the assigned freelancer, only once �
 live in `src/app/api/opportunities/[id]/claim/route.ts`, not on the blockchain.
 This is custodial escrow. The transfers are real; the enforcement is our code.
 
+### The disputed path
+
+A dispute reroutes step 3. The AI mediator issues a verdict with a percentage,
+and `src/app/api/disputes/[id]/settle/route.ts` pays it out — but only once
+**both** parties have accepted, and never on the model's recommendation alone.
+A split writes two rows, `claim` and `refund`, divided in integer luna so they
+sum to the escrow exactly. The same guards apply as on the normal claim path:
+reserve the row before signing, unique constraint for idempotency, daily
+ceiling, `failed` rows left for a human rather than silently retried.
+
+An `escalate` verdict is not settleable. The funds stay held.
+
 Why not an HTLC, given Nimiq supports them natively: `@nimiq/mini-app-sdk`
 v0.1.0 exposes no contract-creation method, and `@nimiq/core`'s
 `Transaction.sign()` throws on HTLC redemption. Neither side of a redemption can
@@ -73,7 +85,12 @@ above.
   authenticated with. Nothing in a request body influences where money goes.
 - **Idempotency** is a unique constraint on `EscrowTransaction(agreementId,
   type)`, and the row is written *before* signing. Two concurrent claims: one
-  wins the insert, the other never reaches the signer.
+  wins the insert, the other never reaches the signer. A mediated split uses
+  the two distinct types, so each leg gets the same protection independently.
+- **Consent.** No payout follows from an AI verdict alone. `openerAccepted` and
+  `respondentAccepted` on `Dispute` are the only thing that authorises a
+  settlement, and the split comes from the stored verdict — never a request
+  body.
 - **Retry safety.** Before signing, the chain is checked for an existing payout
   from escrow to that address since approval. A failure that might have
   broadcast leaves the row claimed and needs a human — reopening it is how

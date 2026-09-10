@@ -23,6 +23,10 @@ export type OpportunityStatus =
   | 'submitted'
   | 'completed'
   | 'disputed'
+  // Terminal states reachable only through mediation, once both parties have
+  // accepted the mediator's verdict.
+  | 'refunded'
+  | 'settled'
   | 'cancelled'
 
 export interface Agreement {
@@ -109,6 +113,9 @@ export interface Dispute {
   caseSummary?: string
   findings?: string
   recommendedOutcome?: 'release' | 'refund' | 'partial_refund' | 'escalate'
+  freelancerPercent?: number
+  openerAccepted: boolean
+  respondentAccepted: boolean
   createdAt: Date
   resolvedAt?: Date
 }
@@ -127,6 +134,7 @@ export interface MediatorVerdict {
   case_summary: string
   findings: string
   recommended_outcome: 'release' | 'refund' | 'partial_refund' | 'escalate'
+  freelancer_percent: number
 }
 
 export interface SessionJWT {

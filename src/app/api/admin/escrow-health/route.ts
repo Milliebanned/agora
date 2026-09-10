@@ -57,8 +57,11 @@ export async function GET(request: NextRequest) {
     // owes, which is the one that needs waking somebody up.
     const healthy = drift !== null && drift >= 0
 
+    // Refunds are counted alongside claims: a mediated settlement pays the
+    // client as well as the freelancer, and a stuck refund is just as much
+    // somebody waiting on money that never arrived.
     const stuck = await prisma.escrowTransaction.count({
-      where: { type: 'claim', status: { in: ['pending', 'failed'] } },
+      where: { type: { in: ['claim', 'refund'] }, status: { in: ['pending', 'failed'] } },
     })
 
     return NextResponse.json({

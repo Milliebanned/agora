@@ -112,7 +112,8 @@ export function sortOrderBy(sort: string | null) {
 //   assigned  a freelancer is engaged and the held funds are earmarked for them
 //   released  the client approved and the funds were paid out to the freelancer
 //   refunded  returned to the client
-export type EscrowStage = 'unfunded' | 'held' | 'assigned' | 'released' | 'refunded'
+//   split     a mediated verdict both parties accepted divided the escrow
+export type EscrowStage = 'unfunded' | 'held' | 'assigned' | 'released' | 'refunded' | 'split'
 
 export function escrowStage(a: {
   status: string
@@ -120,6 +121,7 @@ export function escrowStage(a: {
   htlcAddress?: string | null
 }): EscrowStage {
   if (a.status === 'completed') return 'released'
+  if (a.status === 'settled') return 'split'
   if (a.status === 'cancelled' || a.status === 'refunded') return 'refunded'
   // htlcAddress carries the on-chain funding transaction of the escrow payment.
   if (a.status === 'locked' || a.status === 'submitted' || a.status === 'disputed')
@@ -151,6 +153,11 @@ export const ESCROW_STAGE_COPY: Record<EscrowStage, { label: string; detail: str
   refunded: {
     label: 'Refunded',
     detail: 'The escrow returned to the client.',
+  },
+  split: {
+    label: 'Split by mediation',
+    detail:
+      'Both parties accepted the mediator’s verdict and the escrow was divided between them on-chain.',
   },
 }
 

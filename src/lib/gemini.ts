@@ -53,8 +53,17 @@ const VERDICT_SCHEMA = {
       type: 'string',
       enum: ['release', 'refund', 'partial_refund', 'escalate'],
     },
+    // The outcome names the direction; this names the amount. Requiring it on
+    // every verdict rather than only on a partial means the payout code reads
+    // one field instead of branching, and the model has to state a number it
+    // can be held to even when that number is 100 or 0.
+    freelancer_percent: {
+      type: 'integer',
+      description:
+        'Share of the escrow the freelancer has earned, 0-100. 100 for release, 0 for refund, the reasoned split for partial_refund, and your best estimate for escalate (it is not paid out).',
+    },
   },
-  required: ['case_summary', 'findings', 'recommended_outcome'],
+  required: ['case_summary', 'findings', 'recommended_outcome', 'freelancer_percent'],
 }
 
 const RISK_FLAGS_SCHEMA = {
@@ -108,14 +117,25 @@ export async function generateMediatorVerdict(
   return generateJson<MediatorVerdict>(
     REASONING_MODEL,
     `You are the neutral mediator for a disputed escrow agreement on NimTrust.
-Funds are locked in a Nimiq HTLC. Your recommendation decides where they go:
-  release        — the provider delivered; pay them
-  refund         — the provider did not deliver; return funds to the buyer
-  partial_refund — the work was partly delivered; split the escrow
+The budget is held in NimTrust's escrow account, already paid out of the
+client's wallet. Your verdict is a recommendation: it moves money only if both
+parties accept it, so write findings that could persuade the side it goes
+against.
+
+  release        — the freelancer delivered what was agreed; pay them in full
+  refund         — the freelancer did not deliver; return the escrow to the client
+  partial_refund — partly delivered; split the escrow between them
   escalate       — the evidence is too thin or contradictory to call
 
-Weigh only the evidence below. Cite specific milestones, dates, and messages in
-your findings, and do not invent facts that are not present.
+State freelancer_percent on every verdict: 100 for release, 0 for refund, and
+for a partial, the share the delivered work actually earned. Anchor that number
+to the deliverables — if three were promised and two arrived complete and on
+time, say so and let the number follow from it.
+
+Weigh only the evidence below. Cite specific deliverables, dates, and messages
+in your findings, and do not invent facts that are not present. Late delivery
+of complete work and on-time delivery of incomplete work are different failures
+— do not treat them alike.
 
 === AGREEMENT ===
 ${agreementDetails}
@@ -138,8 +158,8 @@ export async function chatWithAssistant(userMessage: string) {
   const interaction = await getGeminiClient().interactions.create({
     model: FAST_MODEL,
     input: `You are the NimTrust assistant. NimTrust is a Nimiq Pay mini app where
-strangers agree on work, lock payment in an HTLC escrow, and settle by approval
-or AI mediation. Answer briefly and practically.
+strangers agree on work, lock payment in escrow, and settle by approval or by
+AI mediation that both parties accept. Answer briefly and practically.
 
 ${userMessage}`,
     generation_config: { max_output_tokens: 800, thinking_level: 'minimal' },
