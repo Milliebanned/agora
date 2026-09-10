@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Copy, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { shortAddress, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/input'
@@ -35,6 +36,7 @@ function scoreTone(score: number) {
 }
 
 export default function ProfilePage() {
+  const [copied, setCopied] = useState(false)
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -140,9 +142,26 @@ export default function ProfilePage() {
                 <h2 className="text-[20px] font-medium tracking-heading">{profile.displayName}</h2>
                 <Badge tone={profile.role ? 'accent' : 'neutral'}>{roleLabel(profile.role)}</Badge>
               </div>
-              <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">
-                {shortAddress(profile.address)}
-              </p>
+              {/* Shown in full, not shortened. This is the address that
+                  identifies you to the platform, and a truncated one cannot be
+                  copied into anything that needs it. */}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(profile.address)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1800)
+                }}
+                title="Copy your wallet address"
+                className="group mt-0.5 flex items-center gap-1.5 text-left font-mono text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <span className="break-all">{profile.address}</span>
+                {copied ? (
+                  <Check className="h-3 w-3 shrink-0 text-success" />
+                ) : (
+                  <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                )}
+              </button>
               <p className="mt-0.5 text-[12px] text-subtle-foreground">
                 Joined {formatDate(profile.createdAt)}
               </p>
