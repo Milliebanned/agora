@@ -201,8 +201,14 @@ export default function DisputeDetailPage() {
   const viewerDecision = isOpener ? dispute.openerDecision : dispute.respondentDecision
   const wasRejected =
     dispute.openerDecision === 'rejected' || dispute.respondentDecision === 'rejected'
-  const hasVerdict =
-    dispute.status === 'under_review' || dispute.status === 'resolved' || dispute.status === 'escalated'
+  // Everything about a case after its first verdict lives in one card: the
+  // findings, the accept/reject buttons, the human-review notice and the
+  // mediator's ruling form. So this list is not cosmetic — a status missing
+  // from it hides the only control that status exists to offer, which is how
+  // a case referred to a human ended up with no way for the human to rule.
+  const hasVerdict = ['under_review', 'resolved', 'escalated', 'human_review'].includes(
+    dispute.status,
+  )
 
   // Shown to both sides in NIM as well as percent: a split reads very
   // differently as "60%" than as "the 300 NIM you are not getting".
