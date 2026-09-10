@@ -38,6 +38,23 @@ export async function GET() {
       PLATFORM_ADMIN_ADDRESSES: {
         set: envIsSet('PLATFORM_ADMIN_ADDRESSES'),
         count: envCount('PLATFORM_ADMIN_ADDRESSES'),
+        // Masked, plus the normalised length. A clean Nimiq address normalises
+        // to 36 characters; anything else means the stored value carries
+        // something the comparison will never match — wrapping quotes being the
+        // usual culprit, and invisible in a dashboard field.
+        entries: ((process.env as Record<string, string | undefined>)
+          .PLATFORM_ADMIN_ADDRESSES ?? '')
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean)
+          .map((v) => {
+            const normalised = v.replace(/\s+/g, '').toUpperCase()
+            return {
+              masked: `${normalised.slice(0, 8)}…${normalised.slice(-4)}`,
+              normalisedLength: normalised.length,
+              looksLikeAddress: /^NQ[0-9A-Z]{34}$/.test(normalised),
+            }
+          }),
       },
       NIMIQ_NETWORK: { set: envIsSet('NIMIQ_NETWORK') },
       NEXT_PUBLIC_NIMIQ_NETWORK: { set: envIsSet('NEXT_PUBLIC_NIMIQ_NETWORK') },
