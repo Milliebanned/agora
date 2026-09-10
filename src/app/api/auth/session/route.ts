@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySessionToken } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { isPlatformAdmin } from '@/lib/admin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +25,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ user })
+    // Derived from the environment on every request rather than stored, so
+    // revoking a mediator is a deploy and not a database edit that could be
+    // missed.
+    return NextResponse.json({ user: { ...user, isPlatformMediator: isPlatformAdmin(user.address) } })
   } catch (error) {
     console.error('Session check error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

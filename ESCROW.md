@@ -54,6 +54,19 @@ and the only visible symptom is a payment the app swears never happened.
 A payment signed for the wrong chain is now rejected by name at
 `src/lib/escrow-verify.ts` rather than disappearing into that hole.
 
+## Human mediation
+
+`PLATFORM_ADMIN_ADDRESSES` names the wallets that may rule on a dispute. This
+is the most powerful permission in the app after the escrow key itself: a
+mediator can read any dispute's evidence and move its escrow, immediately, with
+no acceptance step. Grant it to as few people as possible, and note that it is
+held in the environment rather than the database precisely so a database
+compromise cannot grant it.
+
+The AI's verdict is a recommendation both parties may refuse. A mediator's
+ruling is binding, so it records who made it and requires reasoning that both
+parties read. A mediator who is a party to the dispute is refused.
+
 ## The key
 
 `NIMIQ_ESCROW_PRIVATE_KEY` controls every NIM in escrow. If it leaks, all of it

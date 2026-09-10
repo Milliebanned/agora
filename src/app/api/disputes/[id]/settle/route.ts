@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
-import { payFromEscrow, EscrowConfigError } from '@/lib/escrow-wallet'
+import { settleEscrow } from '@/lib/settlement'
 import { recordCompletion } from '@/lib/reputation'
 
 // @nimiq/core is WebAssembly and signs with a real key — Node runtime, not edge.
 export const runtime = 'nodejs'
 // Two signatures and two broadcasts on a split verdict.
 export const maxDuration = 60
-
-const DAILY_LIMIT_NIM = Number(process.env.ESCROW_DAILY_LIMIT_NIM ?? '0')
 
 // A mediated settlement. The AI wrote a recommendation; this is where it
 // becomes a payment, and only because both people said it should.
@@ -144,120 +141,31 @@ export async function POST(
     }
 
     // ---- Both sides have accepted. The verdict is now binding. ----
-
-    // Rule 3 — the arithmetic, in integer luna so a split can neither invent
-    // money nor strand a fraction of it. The two legs sum to the escrow
-    // exactly, by construction: the client's share is the remainder.
+    //
+    // The money moves through the same code a human mediator's ruling uses.
+    // Who authorised a settlement differs; how the escrow is divided and paid
+    // must not.
     const percent = Math.max(0, Math.min(100, after.freelancerPercent ?? 0))
-    const totalLuna = Math.round(Number(opportunity.amountNIM) * 1e5)
-    const freelancerLuna = Math.floor((totalLuna * percent) / 100)
-    const clientLuna = totalLuna - freelancerLuna
 
-    const legs = [
-      { type: 'claim', recipient: freelancerAddress, luna: freelancerLuna, who: 'freelancer' },
-      { type: 'refund', recipient: clientAddress, luna: clientLuna, who: 'client' },
-    ].filter((leg) => leg.luna > 0)
+    const result = await settleEscrow({
+      agreementId: opportunity.id,
+      percent,
+      freelancerAddress,
+      clientAddress,
+      amountNIM: Number(opportunity.amountNIM),
+    })
 
-    // Rule 4's ceiling, checked across everything about to leave the wallet.
-    if (DAILY_LIMIT_NIM > 0) {
-      const outgoing = legs.reduce((sum, leg) => sum + leg.luna / 1e5, 0)
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-      const recent = await prisma.escrowTransaction.aggregate({
-        where: {
-          type: { in: ['claim', 'refund'] },
-          status: { in: ['confirmed', 'pending'] },
-          createdAt: { gte: since },
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error, detail: result.detail, partiallyPaid: result.paid },
+        {
+          status:
+            result.failure === 'daily_limit' ? 429 : result.failure === 'in_progress' ? 409 : 500,
         },
-        _sum: { amountNIM: true },
-      })
-      const paidToday = Number(recent._sum.amountNIM ?? 0)
-      if (paidToday + outgoing > DAILY_LIMIT_NIM) {
-        console.error(
-          `[escrow] DAILY LIMIT REACHED — refusing settlement of ${outgoing} NIM for deal ${opportunity.id}. ${paidToday} NIM already paid in the last 24h against a ${DAILY_LIMIT_NIM} NIM ceiling.`,
-        )
-        return NextResponse.json(
-          {
-            error:
-              'Payouts are temporarily paused for review. Both acceptances are recorded and nothing was lost — the settlement will complete once an operator lifts the pause.',
-          },
-          { status: 429 },
-        )
-      }
+      )
     }
 
-    const paid: { who: string; amountNIM: number; txHash: string }[] = []
-
-    for (const leg of legs) {
-      const amountNIM = leg.luna / 1e5
-
-      // Already sent on an earlier attempt? Report it, do not repeat it.
-      const settled = await prisma.escrowTransaction.findFirst({
-        where: { agreementId: opportunity.id, type: leg.type, status: 'confirmed' },
-      })
-      if (settled) {
-        paid.push({ who: leg.who, amountNIM, txHash: settled.txHash ?? '' })
-        continue
-      }
-
-      // Reserve before signing. If both parties' requests raced to here, one
-      // loses this insert and never reaches the signer.
-      let reservation
-      try {
-        reservation = await prisma.escrowTransaction.create({
-          data: { agreementId: opportunity.id, type: leg.type, status: 'pending', amountNIM },
-        })
-      } catch (err) {
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-          return NextResponse.json(
-            { error: 'This settlement is already being paid out.' },
-            { status: 409 },
-          )
-        }
-        throw err
-      }
-
-      try {
-        const payout = await payFromEscrow({ recipientAddress: leg.recipient, amountNIM })
-        await prisma.escrowTransaction.update({
-          where: { id: reservation.id },
-          data: { status: 'confirmed', txHash: payout.txHash, confirmedAt: new Date() },
-        })
-        paid.push({ who: leg.who, amountNIM, txHash: payout.txHash })
-      } catch (err) {
-        // Same reasoning as the claim route: a configuration error is raised
-        // before anything is signed, so the reservation is released and the
-        // settlement can be retried once an operator fixes it. Any other
-        // failure might have reached the network, so the row stays `failed`
-        // and a human decides — reopening a payout that may have gone out is
-        // how somebody gets paid twice.
-        const isPreFlight = err instanceof EscrowConfigError
-        if (isPreFlight) {
-          await prisma.escrowTransaction.delete({ where: { id: reservation.id } })
-        } else {
-          await prisma.escrowTransaction.update({
-            where: { id: reservation.id },
-            data: { status: 'failed' },
-          })
-        }
-
-        console.error(`[escrow] settlement leg (${leg.who}) failed for deal ${opportunity.id}:`, err)
-
-        return NextResponse.json(
-          {
-            error: isPreFlight
-              ? 'The escrow wallet is misconfigured — the settlement is agreed but cannot pay out until an operator fixes it.'
-              : `The ${leg.who}'s share could not be paid. Both acceptances stand and an operator has been alerted.`,
-            detail: err instanceof Error ? err.message : String(err),
-            partiallyPaid: paid,
-          },
-          { status: 500 },
-        )
-      }
-    }
-
-    // Both legs are on-chain. Close the dispute and put the deal in the
-    // terminal state that describes what actually happened to the money.
-    const finalStatus = percent === 100 ? 'completed' : percent === 0 ? 'refunded' : 'settled'
+    const paid = result.paid
 
     await prisma.$transaction([
       prisma.dispute.update({
@@ -267,7 +175,7 @@ export async function POST(
       prisma.agreement.update({
         where: { id: opportunity.id },
         data: {
-          status: finalStatus,
+          status: result.finalStatus,
           ...(percent === 100 ? { completedAt: new Date() } : {}),
         },
       }),

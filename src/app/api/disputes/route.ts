@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { recordDispute } from '@/lib/reputation'
+import { isPlatformAdmin } from '@/lib/admin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,9 +11,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // A platform mediator additionally sees every case waiting on a human —
+    // otherwise there is no way to find the queue they are meant to work.
+    // They do not see other people's disputes that nobody asked them to judge.
+    const me = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: { address: true },
+    })
+    const mediatorClause = isPlatformAdmin(me?.address)
+      ? [{ status: 'human_review' as const }]
+      : []
+
     const disputes = await prisma.dispute.findMany({
       where: {
-        OR: [{ openerId: user.userId }, { respondentId: user.userId }],
+        OR: [
+          { openerId: user.userId },
+          { respondentId: user.userId },
+          ...mediatorClause,
+        ],
       },
       include: {
         opener: true,

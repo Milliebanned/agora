@@ -11,25 +11,26 @@ generator client {
 
 // User (wallet-based auth, no passwords)
 model User {
-  id                String   @id @default(cuid())
-  address           String   @unique // Nimiq wallet address
-  displayName       String?
-  bio               String?
+  id          String   @id @default(cuid())
+  address     String   @unique // Nimiq wallet address
+  displayName String?
+  bio         String?
   // Marketplace side chosen right after wallet connect.
   // "provider" = offers services, "client" = requires services.
   // Null until the user picks one on /onboarding.
-  role              String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  role        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  sentAgreements    Agreement[] @relation("Buyer")
-  receivedAgreements Agreement[] @relation("Seller")
-  sentMessages      Message[]
-  openedDisputes    Dispute[]   @relation("Opener")
-  receivedDisputes  Dispute[]   @relation("Respondent")
-  reputationScores  ReputationScore?
-  proposals         Proposal[]  @relation("Freelancer")
+  sentAgreements     Agreement[]      @relation("Buyer")
+  receivedAgreements Agreement[]      @relation("Seller")
+  sentMessages       Message[]
+  openedDisputes     Dispute[]        @relation("Opener")
+  mediatedDisputes   Dispute[]        @relation("Mediator")
+  receivedDisputes   Dispute[]        @relation("Respondent")
+  reputationScores   ReputationScore?
+  proposals          Proposal[]       @relation("Freelancer")
 }
 
 // Agreement — a marketplace opportunity across its whole life.
@@ -46,58 +47,58 @@ model User {
 //   disputed  either party escalated to the AI mediator
 //   cancelled withdrawn before a freelancer was accepted
 model Agreement {
-  id                String   @id @default(cuid())
-  title             String
-  description       String   @db.Text
-  status            String   @default("draft")
+  id          String @id @default(cuid())
+  title       String
+  description String @db.Text
+  status      String @default("draft")
 
   // Structured posting fields (replaces the AI-drafted agreement flow)
-  category          String?  // see CATEGORIES in src/lib/opportunities.ts
-  serviceType       String?  // the specific service within the category
-  timelineDays      Int?     // working days the client is asking for
-  budgetNIM         Decimal? // budget as posted; amountNIM narrows to the accepted bid
-  attachments       String   @default("[]") @db.Text // JSON array of { label, url }
+  category     String? // see CATEGORIES in src/lib/opportunities.ts
+  serviceType  String? // the specific service within the category
+  timelineDays Int? // working days the client is asking for
+  budgetNIM    Decimal? // budget as posted; amountNIM narrows to the accepted bid
+  attachments  String   @default("[]") @db.Text // JSON array of { label, url }
 
   // Parties
-  buyerId           String
-  buyer             User     @relation("Buyer", fields: [buyerId], references: [id])
-  sellerId          String?
-  seller            User?    @relation("Seller", fields: [sellerId], references: [id])
+  buyerId  String
+  buyer    User    @relation("Buyer", fields: [buyerId], references: [id])
+  sellerId String?
+  seller   User?   @relation("Seller", fields: [sellerId], references: [id])
 
   // Terms
-  amountNIM         Decimal  // Escrow amount in NIM (== budgetNIM until a bid is accepted)
-  deadline          DateTime
-  deliverables      String   @db.Text // JSON array of strings
-  completionTerms   String   @db.Text
-  refundTerms       String   @db.Text
+  amountNIM       Decimal // Escrow amount in NIM (== budgetNIM until a bid is accepted)
+  deadline        DateTime
+  deliverables    String   @db.Text // JSON array of strings
+  completionTerms String   @db.Text
+  refundTerms     String   @db.Text
 
   // HTLC Escrow
-  htlcAddress       String?  // Nimiq HTLC contract address (on-chain)
-  htlcHashRoot      String?  // Hash of the release secret
-  htlcPreImage      String?  // Release secret (revealed on approval)
-  htlcTimeout       Int?     // Block height expiration
+  htlcAddress  String? // Nimiq HTLC contract address (on-chain)
+  htlcHashRoot String? // Hash of the release secret
+  htlcPreImage String? // Release secret (revealed on approval)
+  htlcTimeout  Int? // Block height expiration
 
   // Work handed in by the freelancer, reviewed by the client and, if it comes
   // to that, by the AI mediator against the deliverables above.
-  workSubmission    String?  @db.Text
+  workSubmission String? @db.Text
 
   // Risk Assessment (AI-generated)
-  riskFlags         String   @db.Text // JSON array of risk warnings
+  riskFlags String @db.Text // JSON array of risk warnings
 
   // Timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  publishedAt       DateTime? // escrow committed, listed on the board
-  lockedAt          DateTime? // proposal accepted, HTLC created
-  workSubmittedAt   DateTime?
-  completedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  publishedAt     DateTime? // escrow committed, listed on the board
+  lockedAt        DateTime? // proposal accepted, HTLC created
+  workSubmittedAt DateTime?
+  completedAt     DateTime?
 
   // Relations
-  proposals         Proposal[]
-  milestones        Milestone[]
+  proposals          Proposal[]
+  milestones         Milestone[]
   escrowTransactions EscrowTransaction[]
-  messages          Message[]
-  disputes          Dispute[]
+  messages           Message[]
+  disputes           Dispute[]
 
   // The board reads open postings newest-first; the profile reads by party.
   @@index([status, publishedAt])
@@ -110,20 +111,20 @@ model Agreement {
 // Proposals are the only contact before selection: the private chat opens once
 // one is accepted, which is also the moment the HTLC is created on-chain.
 model Proposal {
-  id                String   @id @default(cuid())
-  agreementId       String
-  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  agreementId String
+  agreement   Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
-  freelancerId      String
-  freelancer        User     @relation("Freelancer", fields: [freelancerId], references: [id])
+  freelancerId String
+  freelancer   User   @relation("Freelancer", fields: [freelancerId], references: [id])
 
-  coverLetter       String   @db.Text
-  bidNIM            Decimal  // never above the posted budget — the escrow is already committed
-  deliveryDays      Int
-  status            String   @default("pending") // pending, accepted, rejected, withdrawn
+  coverLetter  String  @db.Text
+  bidNIM       Decimal // never above the posted budget — the escrow is already committed
+  deliveryDays Int
+  status       String  @default("pending") // pending, accepted, rejected, withdrawn
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // One pitch per freelancer per opportunity; they edit rather than re-post.
   @@unique([agreementId, freelancerId])
@@ -132,42 +133,42 @@ model Proposal {
 
 // Milestone (deliverable checkpoint)
 model Milestone {
-  id                String   @id @default(cuid())
-  agreementId       String
-  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  agreementId String
+  agreement   Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
-  title             String
-  description       String   @db.Text
-  status            String   @default("pending") // pending, submitted, approved, rejected
-  deliverable       String?  @db.Text // Work submitted by seller, set on submission
+  title       String
+  description String  @db.Text
+  status      String  @default("pending") // pending, submitted, approved, rejected
+  deliverable String? @db.Text // Work submitted by seller, set on submission
 
-  createdAt         DateTime @default(now())
-  submittedAt       DateTime?
-  approvedAt        DateTime?
+  createdAt   DateTime  @default(now())
+  submittedAt DateTime?
+  approvedAt  DateTime?
 }
 
 // Escrow Transaction (HTLC fund/claim/refund events)
 model EscrowTransaction {
-  id                String   @id @default(cuid())
-  agreementId       String
-  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  agreementId String
+  agreement   Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
   // "fund"   the client's on-chain payment into the escrow wallet
   // "claim"  the payout from the escrow wallet to the freelancer
   // "refund" the escrow returned to the client
-  type              String
-  status            String   @default("pending") // pending, confirmed, failed
-  txHash            String?  // On-chain Nimiq transaction hash
-  amountNIM         Decimal? // What actually moved, for the outflow ceiling
+  type      String
+  status    String   @default("pending") // pending, confirmed, failed
+  txHash    String? // On-chain Nimiq transaction hash
+  amountNIM Decimal? // What actually moved, for the outflow ceiling
 
   // Who actually sent an incoming payment. Nimiq Pay pays from the account the
   // user has active, which is not necessarily the one the app read at login, so
   // this is frequently not the same as the buyer's address — and the difference
   // is worth keeping rather than assuming away.
-  fromAddress       String?
+  fromAddress String?
 
-  createdAt         DateTime @default(now())
-  confirmedAt       DateTime?
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
 
   // The idempotency guarantee for payouts, enforced by the database rather than
   // by a check-then-act in application code: a second concurrent claim for the
@@ -179,36 +180,36 @@ model EscrowTransaction {
 
 // Message (agreement chat)
 model Message {
-  id                String   @id @default(cuid())
-  agreementId       String
-  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  agreementId String
+  agreement   Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
-  senderId          String
-  sender            User     @relation(fields: [senderId], references: [id])
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id])
 
-  type              String   @default("text") // text, system
-  content           String   @db.Text
+  type    String @default("text") // text, system
+  content String @db.Text
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 // Dispute (conflict resolution)
 model Dispute {
-  id                String   @id @default(cuid())
-  agreementId       String
-  agreement         Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  agreementId String
+  agreement   Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
-  openerId          String
-  opener            User     @relation("Opener", fields: [openerId], references: [id])
-  respondentId      String
-  respondent        User     @relation("Respondent", fields: [respondentId], references: [id])
+  openerId     String
+  opener       User   @relation("Opener", fields: [openerId], references: [id])
+  respondentId String
+  respondent   User   @relation("Respondent", fields: [respondentId], references: [id])
 
-  reason            String
-  status            String   @default("open") // open, under_review, resolved
+  reason String
+  status String @default("open") // open, under_review, resolved
 
   // AI Mediator Verdict
-  caseSummary       String?  @db.Text
-  findings          String?  @db.Text
+  caseSummary        String? @db.Text
+  findings           String? @db.Text
   recommendedOutcome String? // "release", "refund", "partial_refund", "escalate"
 
   // What share of the escrow the mediator judged the freelancer to have earned:
@@ -227,22 +228,34 @@ model Dispute {
   openerDecision     String?
   respondentDecision String?
 
-  createdAt         DateTime @default(now())
-  resolvedAt        DateTime?
+  // Human mediation. The AI's verdict is a recommendation both parties may
+  // refuse; a platform mediator's ruling is binding, which is exactly why it
+  // records who made it and what they said. A ruling nobody signed their name
+  // to is not accountability, it is just another anonymous verdict.
+  humanRequestedAt   DateTime? // a party asked for a person to look
+  humanRequestedById String?
+  mediatorId         String? // the platform mediator who ruled
+  mediator           User?     @relation("Mediator", fields: [mediatorId], references: [id])
+  humanRuling        String?   @db.Text // their reasoning, shown to both parties
+  humanRulingPercent Int? // share of the escrow awarded to the freelancer
+  ruledAt            DateTime?
+
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
 }
 
 // Reputation / Trust Score
 model ReputationScore {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  totalAgreements   Int      @default(0)
-  completedAgreements Int    @default(0)
-  avgDeliveryDays   Decimal  @default(0)
-  disputeRate       Decimal  @default(0) // percentage
+  totalAgreements     Int     @default(0)
+  completedAgreements Int     @default(0)
+  avgDeliveryDays     Decimal @default(0)
+  disputeRate         Decimal @default(0) // percentage
 
-  trustScore        Int      @default(0) // 0-100
+  trustScore Int @default(0) // 0-100
 
-  updatedAt         DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 }
