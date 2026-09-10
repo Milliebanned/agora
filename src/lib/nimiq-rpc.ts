@@ -5,17 +5,15 @@
 // server checks the chain itself before it treats an opportunity as funded.
 // Nothing here trusts anything the browser said about money.
 
-const RPC_URL =
-  process.env.NIMIQ_NETWORK === 'mainnet'
-    ? process.env.NIMIQ_MAINNET_RPC_ENDPOINT
-    : process.env.NIMIQ_RPC_ENDPOINT
+import { rpcEndpoint, resolveNetwork } from './nimiq-network'
 
 export class RpcError extends Error {}
 
 async function rpc<T>(method: string, params: unknown[] = []): Promise<T> {
-  if (!RPC_URL) {
-    throw new RpcError('No Nimiq RPC endpoint configured (NIMIQ_RPC_ENDPOINT).')
-  }
+  // Resolved per call rather than at import: the endpoint depends on which
+  // chain this deployment is on, and getting that wrong is the difference
+  // between finding a payment and swearing it never happened.
+  const RPC_URL = rpcEndpoint()
 
   const res = await fetch(RPC_URL, {
     method: 'POST',
@@ -26,7 +24,9 @@ async function rpc<T>(method: string, params: unknown[] = []): Promise<T> {
   })
 
   if (!res.ok) {
-    throw new RpcError(`Nimiq RPC ${method} returned HTTP ${res.status}`)
+    throw new RpcError(
+      `Nimiq RPC ${method} returned HTTP ${res.status} (network: ${resolveNetwork()})`,
+    )
   }
 
   const body = await res.json()
@@ -88,6 +88,34 @@ export async function getTransactionsByAddress(
   max = 20,
 ): Promise<ChainTransaction[]> {
   return (await rpc<ChainTransaction[]>('getTransactionsByAddress', [address, max, null])) ?? []
+}
+
+// Wait for a transaction the node has not indexed yet.
+//
+// A payment sits in the mempool for a moment before any node will return it,
+// and asking once — immediately after the wallet broadcasts — reliably finds
+// nothing. That is not "the payment failed"; it is "we asked too early". Poll
+// briefly rather than treating the first miss as an answer.
+//
+// The budget is kept well inside the route's own timeout: a caller that runs
+// out of patience records the payment as pending and confirms it later, which
+// is a far better outcome than holding the request open until it dies.
+export async function waitForTransaction(
+  hash: string,
+  { attempts = 6, intervalMs = 2500 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<ChainTransaction | null> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const tx = await getTransactionByHash(hash)
+      if (tx) return tx
+    } catch (err) {
+      // A node that is unreachable this second may answer the next. Only the
+      // final attempt's failure is worth surfacing.
+      if (i === attempts - 1) throw err
+    }
+    if (i < attempts - 1) await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return null
 }
 
 // Nimiq addresses are written with spaces in the UI but compared without them,

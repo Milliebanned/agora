@@ -14,6 +14,7 @@
 // web app. See ESCROW.md.
 
 import { getBlockNumber, sendRawTransaction, sameAddress } from './nimiq-rpc'
+import { networkId as resolveNetworkId } from './nimiq-network'
 
 // Bundling this into a client component would ship the key-reading code to the
 // browser. It cannot happen through any current import path, and this makes
@@ -42,32 +43,16 @@ function requireEnv(name: string): string {
   return value
 }
 
-// Nimiq network ids, confirmed against @nimiq/core: signing a transaction with
-// 24 reports network "mainalbatross", and 5 reports "testalbatross". A wrong
-// value fails safe anyway — the network rejects the transaction as invalid
-// rather than paying the wrong person.
-const NETWORK_IDS: Record<string, number> = {
-  mainnet: 24, // MainAlbatross
-  testnet: 5, // TestAlbatross
-}
-
+// The network id comes from the one resolver the RPC client also uses, so the
+// chain we sign for and the chain we verify against cannot drift apart. A
+// misconfiguration surfaces as a refusal to sign, not as a payout aimed at the
+// wrong chain.
 function networkId(): number {
-  const explicit = process.env.NIMIQ_NETWORK_ID
-  if (explicit) {
-    const parsed = Number(explicit)
-    if (!Number.isInteger(parsed)) {
-      throw new EscrowConfigError(`NIMIQ_NETWORK_ID must be an integer, got "${explicit}"`)
-    }
-    return parsed
+  try {
+    return resolveNetworkId()
+  } catch (err) {
+    throw new EscrowConfigError(err instanceof Error ? err.message : String(err))
   }
-  const network = process.env.NEXT_PUBLIC_NIMIQ_NETWORK ?? 'testnet'
-  const id = NETWORK_IDS[network]
-  if (id === undefined) {
-    throw new EscrowConfigError(
-      `Unknown network "${network}". Set NIMIQ_NETWORK_ID explicitly.`,
-    )
-  }
-  return id
 }
 
 interface LoadedWallet {

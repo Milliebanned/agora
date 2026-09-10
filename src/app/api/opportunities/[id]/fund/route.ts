@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { randomHex, sha256, nimToSats } from '@/lib/utils'
-import { verifyEscrowFunding } from '@/lib/nimiq-rpc'
+import { getTransactionsByAddress, sameAddress, waitForTransaction } from '@/lib/nimiq-rpc'
+import { checkSignedPayment } from '@/lib/escrow-verify'
 
-// Fund the opportunity. This is where real NIM leaves the client's wallet.
+// @nimiq/core is WebAssembly — Node runtime, not edge.
+export const runtime = 'nodejs'
+// Confirming a fresh payment means waiting for it to leave the mempool.
+export const maxDuration = 60
+
+// Fund the opportunity. This is where real NIM leaves the client's wallet, and
+// the one route where getting it wrong costs the user money rather than time.
 //
-// The browser has already asked Nimiq Pay to send the budget to the NimTrust
-// escrow address and hands us what the wallet returned. That claim is worth
-// nothing on its own — anyone can POST to this route — so the server asks the
-// chain whether the payment actually happened, and only then does the posting
-// go live. An unverified claim publishes nothing.
+// The ordering below is the whole point of this file. A payment is recorded
+// *before* it is confirmed, because the failure that matters is not "we could
+// not verify it" — it is "we could not verify it, so we left no trace, so the
+// client paid again". A payment the chain has not admitted to yet is a payment
+// that still happened.
+//
+// Nimiq Pay hands back the serialized transaction rather than its hash. That
+// blob is signed by the client's own key, so the server can read who paid whom
+// how much and derive the hash from it without asking any node — see
+// src/lib/escrow-verify.ts. Chain confirmation then follows at its own pace.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -39,83 +52,248 @@ export async function POST(
     if (opportunity.buyerId !== user.userId) {
       return NextResponse.json({ error: 'Only the client can fund this escrow' }, { status: 403 })
     }
-    if (opportunity.htlcHashRoot) {
-      return NextResponse.json({ error: 'This escrow is already funded' }, { status: 400 })
+
+    const expectedLuna = nimToSats(Number(opportunity.amountNIM))
+    const skipVerification = process.env.NIMIQ_SKIP_ESCROW_VERIFICATION === 'true'
+
+    // Already live? Say so plainly. A client whose connection dropped mid-publish
+    // must be able to retry the request without it reading as a new payment.
+    if (opportunity.status !== 'draft' || opportunity.htlcHashRoot) {
+      const existing = await prisma.escrowTransaction.findFirst({
+        where: { agreementId: id, type: 'fund' },
+      })
+      return NextResponse.json({
+        message: 'This opportunity is already funded and live. Nothing further was charged.',
+        alreadyFunded: true,
+        opportunity,
+        escrow: { txHash: existing?.txHash ?? null, escrowAddress, verified: true },
+      })
     }
-    if (opportunity.status !== 'draft') {
-      return NextResponse.json(
-        { error: `A ${opportunity.status} opportunity cannot be funded` },
-        { status: 400 },
+
+    const body = await request
+      .json()
+      .catch(() => ({}) as { serialized?: string; txHash?: string; recover?: boolean })
+    const { serialized, txHash: reportedHash, recover } = body as {
+      serialized?: string
+      txHash?: string
+      recover?: boolean
+    }
+
+    // Find a payment into escrow from this client that no posting has used yet.
+    // The last resort when we have no hash: the chain is the only record left.
+    const findUnclaimedPayment = async () => {
+      const consumed = new Set(
+        (
+          await prisma.escrowTransaction.findMany({
+            where: { type: 'fund', txHash: { not: null } },
+            select: { txHash: true },
+          })
+        ).map((t) => t.txHash as string),
+      )
+      const recent = await getTransactionsByAddress(escrowAddress, 100)
+      return recent.find(
+        (tx) =>
+          sameAddress(tx.to, escrowAddress) &&
+          sameAddress(tx.from, opportunity.buyer.address) &&
+          BigInt(Math.round(tx.value)) >= expectedLuna &&
+          !consumed.has(tx.hash),
       )
     }
 
-    const { txHash } = await request.json().catch(() => ({ txHash: null }))
-    const expectedLuna = nimToSats(Number(opportunity.amountNIM))
+    // ---- Step 1: what payment are we talking about? ----
+    //
+    // A pending row from an earlier attempt wins over anything in this request.
+    // If the client already paid and we recorded it, this call resumes that
+    // payment; it must never become the reason for a second one.
+    let pending = await prisma.escrowTransaction.findFirst({
+      where: { agreementId: id, type: 'fund' },
+    })
 
-    // Local development against a mock wallet has no chain to check. It must be
-    // opt-in on the server, never inferred from what the client tells us.
-    const skipVerification = process.env.NIMIQ_SKIP_ESCROW_VERIFICATION === 'true'
+    if (!pending) {
+      let hash: string | null = null
 
-    let confirmedTxHash: string | null = txHash ?? null
+      if (serialized) {
+        // The wallet's own signed transaction. Validated against this deal
+        // before it is recorded — otherwise a 1 NIM transfer could publish a
+        // 500 NIM posting.
+        const check = await checkSignedPayment(serialized, {
+          escrowAddress,
+          payerAddress: opportunity.buyer.address,
+          expectedLuna,
+        })
+        if (check.ok) {
+          hash = check.payment!.txHash
+        } else if (check.payment) {
+          // It decoded, and it is genuinely the wrong payment — wrong address,
+          // wrong payer, or too little. Refusing is right, and no money of this
+          // client's is at stake in this posting.
+          return NextResponse.json(
+            { error: 'That payment does not match this posting', detail: check.reason },
+            { status: 400 },
+          )
+        } else if (/^[0-9a-f]{64}$/i.test(serialized.trim())) {
+          // Not decodable, but it is a transaction hash. Some wallet builds
+          // return the hash where the SDK's types promise the serialized
+          // transaction; take it at its word and let the chain check settle it.
+          hash = serialized.trim()
+        } else {
+          // Unreadable. The client's NIM may well be gone, so this must not end
+          // as a bare error that leaves no record — fall through with no hash
+          // and let the chain scan below find the payment once it lands.
+          console.warn(
+            `[escrow] could not read the wallet's transaction for deal ${id}: ${check.reason}`,
+          )
+        }
+      } else if (reportedHash) {
+        hash = reportedHash
+      } else if (recover) {
+        // "I already paid" — the recovery path for a payment made before this
+        // deal had any record of it. The chain is the only evidence left, so
+        // scan it, and refuse any transaction another posting already used.
+        const match = await findUnclaimedPayment()
+
+        if (!match) {
+          return NextResponse.json(
+            {
+              error: 'No unclaimed payment from your wallet was found in the escrow account',
+              detail:
+                'Either the payment has not been confirmed yet, or it has already been used to publish another posting.',
+            },
+            { status: 404 },
+          )
+        }
+        hash = match.hash
+      } else if (!skipVerification) {
+        return NextResponse.json(
+          { error: 'No payment was supplied to verify.' },
+          { status: 400 },
+        )
+      }
+
+      // ---- Step 2: record it before confirming it. ----
+      //
+      // This is the line that stops a client paying twice. From here on the
+      // payment exists in our records whatever the chain says, and the unique
+      // constraint on (agreementId, type) means a concurrent second attempt
+      // finds this row instead of creating another.
+      try {
+        pending = await prisma.escrowTransaction.create({
+          data: { agreementId: id, type: 'fund', status: 'pending', txHash: hash, amountNIM: Number(opportunity.amountNIM) },
+        })
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          pending = await prisma.escrowTransaction.findFirst({
+            where: { agreementId: id, type: 'fund' },
+          })
+        } else {
+          throw err
+        }
+      }
+    }
+
+    // ---- Step 3: confirm against the chain. ----
+    let confirmedTxHash = pending?.txHash ?? null
 
     if (skipVerification) {
       console.warn(
         'NIMIQ_SKIP_ESCROW_VERIFICATION=true — publishing without checking the chain. Never set this in production.',
       )
     } else {
-      try {
-        const check = await verifyEscrowFunding({
-          escrowAddress,
-          from: opportunity.buyer.address,
-          expectedLuna,
-          txHash,
-        })
-        if (!check.ok) {
+      // A recorded payment we could not name. It exists — the client's wallet
+      // says so — but we never got a hash for it, so the chain is the only way
+      // to identify it. Look for it, and adopt it if it has landed.
+      if (!confirmedTxHash) {
+        const found = await findUnclaimedPayment()
+        if (!found) {
           return NextResponse.json(
             {
-              error: 'Escrow payment could not be confirmed on-chain',
-              detail: check.reason,
+              message:
+                'Your payment is recorded but has not appeared on the network yet. Do not pay again — reopen this page in a minute and it will publish itself.',
+              pending: true,
+              paymentRecorded: true,
             },
-            { status: 402 },
+            { status: 202 },
           )
         }
-        confirmedTxHash = check.transaction?.hash ?? confirmedTxHash
+        confirmedTxHash = found.hash
+        await prisma.escrowTransaction.update({
+          where: { id: pending!.id },
+          data: { txHash: found.hash },
+        })
+      }
+
+      let onChain
+      try {
+        onChain = await waitForTransaction(confirmedTxHash)
       } catch (err) {
+        // The payment stands; only our view of it failed. Say so in a way that
+        // cannot be mistaken for "send it again".
         return NextResponse.json(
           {
-            error: 'Could not reach the Nimiq network to confirm the payment',
+            error: 'Could not reach the Nimiq network to confirm your payment',
             detail: err instanceof Error ? err.message : String(err),
+            paymentRecorded: true,
+            txHash: confirmedTxHash,
           },
           { status: 503 },
         )
       }
+
+      if (!onChain) {
+        // Recorded, broadcast, not yet in a block. The correct answer is "wait",
+        // never "pay again" — 202 rather than an error, because nothing failed.
+        return NextResponse.json(
+          {
+            message:
+              'Your payment is recorded and waiting to confirm on the network. Do not pay again — reopen this page in a minute and it will publish itself.',
+            pending: true,
+            paymentRecorded: true,
+            txHash: confirmedTxHash,
+          },
+          { status: 202 },
+        )
+      }
+
+      // The chain's own copy is the last word on where the money went.
+      if (!sameAddress(onChain.to, escrowAddress)) {
+        return NextResponse.json(
+          { error: 'That transaction did not pay the escrow address.' },
+          { status: 400 },
+        )
+      }
+      if (BigInt(Math.round(onChain.value)) < expectedLuna) {
+        return NextResponse.json(
+          { error: 'That transaction paid less than the posted budget.' },
+          { status: 400 },
+        )
+      }
+      confirmedTxHash = onChain.hash
     }
 
-    // The release secret still governs who gets paid: it is revealed to the
-    // freelancer only when the client approves the work.
+    // ---- Step 4: publish. ----
     const preImage = randomHex(32)
     const hashRoot = await sha256(preImage)
 
-    const published = await prisma.agreement.update({
-      where: { id },
-      data: {
-        htlcHashRoot: hashRoot,
-        htlcPreImage: preImage,
-        status: 'open',
-        publishedAt: new Date(),
-      },
-      include: { buyer: { select: { id: true, address: true, displayName: true } } },
-    })
-
-    await prisma.escrowTransaction.create({
-      data: {
-        agreementId: id,
-        type: 'fund',
-        status: skipVerification ? 'pending' : 'confirmed',
-        txHash: confirmedTxHash,
-        ...(skipVerification ? {} : { confirmedAt: new Date() }),
-      },
-    })
+    const [published] = await prisma.$transaction([
+      prisma.agreement.update({
+        where: { id },
+        data: {
+          htlcHashRoot: hashRoot,
+          htlcPreImage: preImage,
+          status: 'open',
+          publishedAt: new Date(),
+        },
+        include: { buyer: { select: { id: true, address: true, displayName: true } } },
+      }),
+      prisma.escrowTransaction.update({
+        where: { id: pending!.id },
+        data: {
+          status: skipVerification ? 'pending' : 'confirmed',
+          txHash: confirmedTxHash,
+          ...(skipVerification ? {} : { confirmedAt: new Date() }),
+        },
+      }),
+    ])
 
     return NextResponse.json({
       message: skipVerification
