@@ -45,6 +45,29 @@ export async function POST(
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
     }
 
+    // A verdict is evidence in someone else's disagreement. Only the two people
+    // bound by it may ask for one — and, as in the read route, a stranger is
+    // told the dispute does not exist rather than that they may not see it.
+    if (dispute.openerId !== user.userId && dispute.respondentId !== user.userId) {
+      return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
+    }
+
+    // Re-running the mediator once somebody has accepted would let a party who
+    // dislikes the verdict roll the dice again, silently discarding the other
+    // side's acceptance. A settled dispute is likewise final.
+    if (dispute.status === 'resolved') {
+      return NextResponse.json(
+        { error: 'This dispute has already been settled.' },
+        { status: 409 },
+      )
+    }
+    if (dispute.openerAccepted || dispute.respondentAccepted) {
+      return NextResponse.json(
+        { error: 'A verdict is already on the table and has been accepted by one party.' },
+        { status: 409 },
+      )
+    }
+
     // The mediator is judged on one thing: whether it read the deal that was
     // actually struck. So the context it gets is the posting as written — the
     // brief, the deliverables the freelancer signed up to, the money, the
@@ -125,6 +148,17 @@ Their reason: ${dispute.reason}
       submittedWork || 'No work was submitted.',
     )
 
+    // The schema guarantees the field is present and an integer; it does not
+    // guarantee the model kept it inside 0-100, and this number is multiplied
+    // by real money further down. Clamp it here, at the boundary, and force
+    // the two unambiguous outcomes to the only percentages they can mean.
+    const percent =
+      verdict.recommended_outcome === 'release'
+        ? 100
+        : verdict.recommended_outcome === 'refund'
+          ? 0
+          : Math.max(0, Math.min(100, Math.round(verdict.freelancer_percent ?? 0)))
+
     // Update dispute with verdict
     const updated = await prisma.dispute.update({
       where: { id: id },
@@ -133,6 +167,7 @@ Their reason: ${dispute.reason}
         caseSummary: verdict.case_summary,
         findings: verdict.findings,
         recommendedOutcome: verdict.recommended_outcome,
+        freelancerPercent: percent,
       },
       include: {
         opener: { select: { displayName: true, id: true } },
@@ -146,7 +181,12 @@ Their reason: ${dispute.reason}
         agreementId: dispute.agreementId,
         senderId: user.userId,
         type: 'system',
-        content: `AI Mediator Verdict: ${verdict.recommended_outcome.toUpperCase()}. ${verdict.case_summary}`,
+        content:
+          `AI Mediator Verdict: ${verdict.recommended_outcome.replace('_', ' ').toUpperCase()}` +
+          (verdict.recommended_outcome === 'escalate'
+            ? ''
+            : ` — ${percent}% to the freelancer, ${100 - percent}% back to the client`) +
+          `. ${verdict.case_summary}\n\nThis is a recommendation. It moves nothing until both parties accept it.`,
       },
     })
 

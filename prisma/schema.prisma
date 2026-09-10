@@ -205,6 +205,18 @@ model Dispute {
   findings          String?  @db.Text
   recommendedOutcome String? // "release", "refund", "partial_refund", "escalate"
 
+  // What share of the escrow the mediator judged the freelancer to have earned:
+  // 100 for a release, 0 for a refund, and the split it reasoned to for a
+  // partial. Stored as the model returned it so the payout arithmetic and the
+  // findings the parties read can never drift apart.
+  freelancerPercent Int?
+
+  // A verdict is a recommendation until both sides take it. Neither the model
+  // nor the platform can move money on its own — these two booleans are the
+  // only thing that authorises a settlement payout.
+  openerAccepted     Boolean @default(false)
+  respondentAccepted Boolean @default(false)
+
   createdAt         DateTime @default(now())
   resolvedAt        DateTime?
 }

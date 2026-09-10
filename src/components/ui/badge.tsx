@@ -46,6 +46,9 @@ const STATUS_TONES: Record<string, BadgeProps['tone']> = {
   'under review': 'violet',
   cancelled: 'neutral',
   refunded: 'neutral',
+  // A deal closed by a split verdict: finished, but not the clean success
+  // `completed` means, so it does not borrow the green.
+  settled: 'violet',
 }
 
 export function StatusBadge({

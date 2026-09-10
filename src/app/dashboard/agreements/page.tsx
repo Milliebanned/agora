@@ -27,7 +27,7 @@ interface Deal {
   seller?: { displayName: string | null }
 }
 
-const FILTERS = ['all', 'draft', 'open', 'locked', 'submitted', 'completed', 'disputed']
+const FILTERS = ['all', 'draft', 'open', 'locked', 'submitted', 'completed', 'disputed', 'settled']
 
 export default function DealsPage() {
   const router = useRouter()

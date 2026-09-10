@@ -67,12 +67,33 @@ transactions and disputes stay attached when a posting becomes a contract:
 | `open` | Escrow committed, live on the board, taking proposals. |
 | `locked` | Proposal accepted, HTLC created, work under way. Chat open. |
 | `submitted` | Work handed in, awaiting the client's review. |
-| `completed` | Approved; the freelancer can claim the HTLC. |
+| `completed` | Approved; the freelancer can claim the escrow. |
 | `disputed` | Escalated to the AI mediator. |
+| `settled` | A mediated verdict both parties accepted split the escrow. |
+| `refunded` | A mediated verdict returned the escrow to the client. |
 | `cancelled` | Withdrawn before a freelancer was engaged. |
 
 Escrow stage is *derived*, never stored separately (`escrowStage()` in
-`src/lib/opportunities.ts`): `unfunded → committed → locked → released/refunded`.
+`src/lib/opportunities.ts`): `unfunded → held → assigned → released / refunded /
+split`.
+
+## AI Dispute Mediation
+
+Either party can dispute a `locked` or `submitted` deal. The mediator
+(Gemini 3.6 Flash, schema-enforced) reads the original requirements and
+deliverables, the delivery timeline with lateness flagged, the submitted work,
+and the last 40 chat messages, then returns `release` / `refund` /
+`partial_refund` / `escalate` **plus `freelancer_percent`** — the share it
+judges the freelancer to have earned, on every verdict.
+
+**The verdict is a recommendation, not an instruction.** It moves nothing.
+`POST /api/disputes/[id]/settle` records one party's acceptance; the second
+acceptance triggers the payout, splitting the escrow in integer luna so the two
+legs sum to the total exactly. `escalate` cannot be accepted at all — the
+mediator declined to call it, so the case needs a human.
+
+Neither Gemini nor the platform can move money alone. That is the point, and it
+is the honest answer to "you let an AI decide who gets paid?".
 
 ## Build Status: ✅ COMPLETE (5 Days)
 
