@@ -3,6 +3,7 @@ import prisma from '@/lib/db'
 import { assertEscrowWalletReady } from '@/lib/escrow-wallet'
 import { getAccountByAddress } from '@/lib/nimiq-rpc'
 import { resolveNetwork } from '@/lib/nimiq-network'
+import { adminAddresses } from '@/lib/admin'
 
 export const runtime = 'nodejs'
 
@@ -81,6 +82,13 @@ export async function GET(request: NextRequest) {
       // when payments "never arrive": a server pointed at the wrong network
       // finds nothing, forever, and says so in the same words as an empty one.
       network,
+      // What the running deployment actually sees, so "no human mediator is
+      // configured" can be checked rather than guessed at. Masked: this
+      // endpoint is behind a shared secret, not a session.
+      mediators: {
+        configured: adminAddresses().length,
+        addresses: adminAddresses().map((a) => `${a.slice(0, 8)}…${a.slice(-4)}`),
+      },
       escrowAddress: address,
       balanceNIM: balance,
       owedNIM: owed,
