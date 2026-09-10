@@ -15,7 +15,11 @@ export default function RoleGate() {
       .then(async (res) => {
         if (cancelled || !res.ok) return
         const { user } = await res.json()
-        if (!user?.role) router.replace('/onboarding')
+        // A platform mediator is neither side of the marketplace, so making
+        // them declare one before they can reach a dispute queue is a question
+        // with no honest answer. They can still pick a role later if they also
+        // want to trade.
+        if (!user?.role && !user?.isPlatformMediator) router.replace('/onboarding')
       })
       .catch(() => {})
     return () => {
