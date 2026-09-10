@@ -65,7 +65,6 @@ export async function decodeSignedPayment(serialized: string): Promise<DecodedPa
 
 export interface PaymentExpectation {
   escrowAddress: string
-  payerAddress: string
   expectedLuna: bigint
 }
 
@@ -78,9 +77,17 @@ export interface PaymentCheck {
 // Does this signed transaction actually pay what this posting's budget requires?
 //
 // Checked against the database's idea of the deal, never against anything else
-// in the request. A transaction that pays the wrong address, comes from the
-// wrong wallet, or underpays is rejected before it is recorded — recording it
-// would let a client publish a 500 NIM posting by paying 1 NIM.
+// in the request. A transaction that pays the wrong address, the wrong chain, or
+// too little is rejected before it is recorded — recording it would let a client
+// publish a 500 NIM posting by paying 1 NIM.
+//
+// What is deliberately *not* checked is which account sent it. Nimiq Pay pays
+// from whichever account the user has active, and the app logs them in as the
+// first account the wallet lists; the two are routinely different accounts of
+// the same wallet. Requiring them to match rejected perfectly good payments and
+// bought nothing, because the transaction in hand is itself signed proof that
+// the client's wallet paid our escrow address this amount. The sender is
+// returned to be recorded rather than used as a gate.
 export async function checkSignedPayment(
   serialized: string,
   expect: PaymentExpectation,
@@ -120,9 +127,6 @@ export async function checkSignedPayment(
 
   if (normalise(payment.to) !== normalise(expect.escrowAddress)) {
     return { ok: false, reason: 'That transaction does not pay the escrow address.', payment }
-  }
-  if (normalise(payment.from) !== normalise(expect.payerAddress)) {
-    return { ok: false, reason: 'That transaction was sent from a different wallet.', payment }
   }
   if (payment.valueLuna < expect.expectedLuna) {
     return { ok: false, reason: 'That transaction pays less than the posted budget.', payment }

@@ -5,6 +5,7 @@ import prisma from '@/lib/db'
 import { randomHex, sha256, nimToSats } from '@/lib/utils'
 import { getTransactionsByAddress, sameAddress, waitForTransaction } from '@/lib/nimiq-rpc'
 import { checkSignedPayment } from '@/lib/escrow-verify'
+import { resolveNetwork } from '@/lib/nimiq-network'
 
 // @nimiq/core is WebAssembly — Node runtime, not edge.
 export const runtime = 'nodejs'
@@ -90,13 +91,38 @@ export async function POST(
           })
         ).map((t) => t.txHash as string),
       )
+
+      // Every other registered wallet. A payment from one of those belongs to
+      // that person's deals, not this one, and must never be adopted here —
+      // that is the only way this scan could take money from someone else.
+      // An address nobody has signed in with is, in practice, another account
+      // of this client's own wallet, which is exactly the case being rescued.
+      const otherUsers = new Set(
+        (
+          await prisma.user.findMany({
+            where: { id: { not: opportunity.buyerId } },
+            select: { address: true },
+          })
+        ).map((u) => u.address.replace(/\s+/g, '').toUpperCase()),
+      )
+
       const recent = await getTransactionsByAddress(escrowAddress, 100)
-      return recent.find(
+      const candidates = recent.filter(
         (tx) =>
           sameAddress(tx.to, escrowAddress) &&
-          sameAddress(tx.from, opportunity.buyer.address) &&
           BigInt(Math.round(tx.value)) >= expectedLuna &&
-          !consumed.has(tx.hash),
+          !consumed.has(tx.hash) &&
+          !otherUsers.has((tx.from ?? '').replace(/\s+/g, '').toUpperCase()) &&
+          // A payment that predates the posting cannot have been made for it.
+          (!tx.timestamp || tx.timestamp >= opportunity.createdAt.getTime() - 60_000),
+      )
+
+      // Prefer one from the address this client signed in with; otherwise take
+      // the oldest candidate, so repeated payments are consumed in the order
+      // they were made rather than stranding the first one.
+      return (
+        candidates.find((tx) => sameAddress(tx.from, opportunity.buyer.address)) ??
+        candidates.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0))[0]
       )
     }
 
@@ -111,18 +137,16 @@ export async function POST(
 
     if (!pending) {
       let hash: string | null = null
+      let fromAddress: string | null = null
 
       if (serialized) {
         // The wallet's own signed transaction. Validated against this deal
         // before it is recorded — otherwise a 1 NIM transfer could publish a
         // 500 NIM posting.
-        const check = await checkSignedPayment(serialized, {
-          escrowAddress,
-          payerAddress: opportunity.buyer.address,
-          expectedLuna,
-        })
+        const check = await checkSignedPayment(serialized, { escrowAddress, expectedLuna })
         if (check.ok) {
           hash = check.payment!.txHash
+          fromAddress = check.payment!.from
         } else if (check.payment) {
           // It decoded, and it is genuinely the wrong payment — wrong address,
           // wrong payer, or too little. Refusing is right, and no money of this
@@ -153,16 +177,27 @@ export async function POST(
         const match = await findUnclaimedPayment()
 
         if (!match) {
+          // "Not found" is the same sentence whether the chain is empty, the
+          // server is on the wrong network, or the payment is simply too small.
+          // Say which, because the difference is the whole diagnosis.
+          const seen = await getTransactionsByAddress(escrowAddress, 100).catch(() => [])
+          const incoming = seen.filter((tx) => sameAddress(tx.to, escrowAddress))
           return NextResponse.json(
             {
-              error: 'No unclaimed payment from your wallet was found in the escrow account',
+              error: 'No unclaimed payment was found in the escrow account',
               detail:
-                'Either the payment has not been confirmed yet, or it has already been used to publish another posting.',
+                incoming.length === 0
+                  ? `The escrow account ${escrowAddress} shows no incoming payments at all on ${resolveNetwork()}. Either the payment has not confirmed yet, or this deployment is pointed at the wrong network or the wrong escrow address.`
+                  : `${incoming.length} incoming payment(s) found on ${resolveNetwork()}, but none of at least ${Number(opportunity.amountNIM)} NIM that is unclaimed and dated after this posting was created.`,
+              network: resolveNetwork(),
+              escrowAddress,
+              incomingSeen: incoming.length,
             },
             { status: 404 },
           )
         }
         hash = match.hash
+        fromAddress = match.from ?? null
       } else if (!skipVerification) {
         return NextResponse.json(
           { error: 'No payment was supplied to verify.' },
@@ -178,7 +213,14 @@ export async function POST(
       // finds this row instead of creating another.
       try {
         pending = await prisma.escrowTransaction.create({
-          data: { agreementId: id, type: 'fund', status: 'pending', txHash: hash, amountNIM: Number(opportunity.amountNIM) },
+          data: {
+            agreementId: id,
+            type: 'fund',
+            status: 'pending',
+            txHash: hash,
+            fromAddress,
+            amountNIM: Number(opportunity.amountNIM),
+          },
         })
       } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -218,7 +260,7 @@ export async function POST(
         confirmedTxHash = found.hash
         await prisma.escrowTransaction.update({
           where: { id: pending!.id },
-          data: { txHash: found.hash },
+          data: { txHash: found.hash, fromAddress: found.from ?? null },
         })
       }
 

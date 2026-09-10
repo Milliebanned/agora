@@ -160,6 +160,12 @@ model EscrowTransaction {
   txHash            String?  // On-chain Nimiq transaction hash
   amountNIM         Decimal? // What actually moved, for the outflow ceiling
 
+  // Who actually sent an incoming payment. Nimiq Pay pays from the account the
+  // user has active, which is not necessarily the one the app read at login, so
+  // this is frequently not the same as the buyer's address — and the difference
+  // is worth keeping rather than assuming away.
+  fromAddress       String?
+
   createdAt         DateTime @default(now())
   confirmedAt       DateTime?
 
