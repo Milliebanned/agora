@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { assertEscrowWalletReady } from '@/lib/escrow-wallet'
 import { getAccountByAddress } from '@/lib/nimiq-rpc'
+import { resolveNetwork } from '@/lib/nimiq-network'
 
 export const runtime = 'nodejs'
 
@@ -25,6 +26,16 @@ export async function GET(request: NextRequest) {
   }
   if (request.headers.get('authorization') !== `Bearer ${token}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  let network: string
+  try {
+    network = resolveNetwork()
+  } catch (err) {
+    return NextResponse.json(
+      { healthy: false, error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    )
   }
 
   try {
@@ -66,6 +77,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       healthy,
+      // Which chain this deployment actually talks to. First thing to check
+      // when payments "never arrive": a server pointed at the wrong network
+      // finds nothing, forever, and says so in the same words as an empty one.
+      network,
       escrowAddress: address,
       balanceNIM: balance,
       owedNIM: owed,

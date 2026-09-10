@@ -33,6 +33,10 @@ export default function EscrowPanel({
   const paidOut = opportunity.escrowTransactions.some(
     (tx) => tx.type === 'claim' && tx.status === 'confirmed',
   )
+  // A payment the client has already made for this posting, whether or not the
+  // chain has caught up. While this exists the pay button must not: the money
+  // is gone and offering to send it again is the bug that costs them twice.
+  const fundAttempt = opportunity.escrowTransactions.find((tx) => tx.type === 'fund')
 
   const json = async (url: string, init?: RequestInit) => {
     const res = await fetch(url, { credentials: 'include', ...init })
@@ -65,22 +69,73 @@ export default function EscrowPanel({
         return
       }
 
+      // Nimiq Pay returns the signed transaction itself rather than a hash.
+      // The server reads the payment out of it — sender, recipient, amount and
+      // hash — so a payment can be recorded before any node has seen it.
       const result = await json(`/api/opportunities/${opportunity.id}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash: transfer.txHash ?? null }),
+        body: JSON.stringify({
+          serialized: transfer.serialized ?? null,
+          txHash: transfer.txHash ?? null,
+        }),
       })
 
       onNotice(result.message)
+      // Even when it has not confirmed yet, the attempt is now on the record,
+      // so re-reading the deal is what replaces the pay button with a status.
       await onChanged()
     } catch (err) {
       // A payment that went through but failed to verify is the case that must
       // never read as "nothing happened" — the client's NIM is already gone.
       onError(
         err instanceof Error
-          ? `${err.message} If your wallet shows the payment as sent, do not send it again — reopen this page in a minute and the confirmation should catch up.`
+          ? `${err.message} If your wallet shows the payment as sent, do not send it again — tap "Check payment status" in a minute.`
           : 'Funding failed',
       )
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // Resume a payment already made. Sends no money: it asks the server to look
+  // again at the transaction it has on file, and publishes if the chain has
+  // caught up since.
+  const checkPayment = async () => {
+    setBusy('check')
+    onError('')
+    try {
+      const result = await json(`/api/opportunities/${opportunity.id}/fund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      onNotice(result.message)
+      await onChanged()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not check the payment')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // The rescue hatch for a posting funded before any of this was recorded: the
+  // client paid, the app lost it, and the only evidence is the chain. Sends no
+  // money either — it looks for an unclaimed payment from this wallet into the
+  // escrow account and attaches it to this posting.
+  const recoverPayment = async () => {
+    setBusy('recover')
+    onError('')
+    try {
+      const result = await json(`/api/opportunities/${opportunity.id}/fund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recover: true }),
+      })
+      onNotice(result.message)
+      await onChanged()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Could not find a payment to recover')
     } finally {
       setBusy(null)
     }
@@ -141,7 +196,37 @@ export default function EscrowPanel({
           </p>
         ) : null}
 
-        {isClient && stage === 'unfunded' && (
+        {/* A payment is already on the record for this posting. It has not
+            confirmed yet, so the only honest actions are to wait or to look
+            again — never to pay. */}
+        {isClient && stage === 'unfunded' && fundAttempt && (
+          <>
+            <div className="mt-4 rounded-md border border-accent/25 bg-accent/[0.06] p-4">
+              <p className="text-[13px] font-medium text-accent">Payment sent, awaiting confirmation</p>
+              <p className="mt-1.5 text-[12px] leading-relaxed text-secondary-foreground">
+                {amount.toFixed(2)} NIM has left your wallet and is recorded against this posting.
+                It publishes itself as soon as the network confirms it.{' '}
+                <span className="font-medium">Do not pay again.</span>
+              </p>
+              {fundAttempt.txHash && (
+                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                  {shortAddress(fundAttempt.txHash, 8)}
+                </p>
+              )}
+            </div>
+            <Button
+              variant="secondary"
+              onClick={checkPayment}
+              disabled={busy !== null}
+              className="mt-3 w-full"
+            >
+              {busy === 'check' ? <Spinner className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+              {busy === 'check' ? 'Checking the network' : 'Check payment status'}
+            </Button>
+          </>
+        )}
+
+        {isClient && stage === 'unfunded' && !fundAttempt && (
           <>
             <Button onClick={fund} disabled={busy !== null} className="mt-4 w-full">
               {busy === 'fund' ? <Spinner className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
@@ -151,6 +236,16 @@ export default function EscrowPanel({
               Nimiq Pay will ask you to confirm. This debits your wallet for real — the posting only
               goes live once the payment is confirmed on-chain.
             </p>
+            <button
+              type="button"
+              onClick={recoverPayment}
+              disabled={busy !== null}
+              className="mt-3 w-full text-[12px] text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              {busy === 'recover'
+                ? 'Looking for your payment…'
+                : 'I already paid for this posting — find my payment'}
+            </button>
           </>
         )}
 

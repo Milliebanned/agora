@@ -41,6 +41,19 @@ v0.1.0 exposes no contract-creation method, and `@nimiq/core`'s
 be signed from this stack, so an HTLC here would lock funds that only a timeout
 could release. Revisit if the SDK gains transaction signing.
 
+## Which chain
+
+`NIMIQ_NETWORK` and `NEXT_PUBLIC_NIMIQ_NETWORK` must both be set and must
+agree. The server refuses to run a money operation rather than guess, and
+`GET /api/admin/escrow-health` reports the network it resolved.
+
+This is load-bearing. A server pointed at the wrong chain does not error — it
+looks for real payments where they were never sent, finds nothing, and reports
+them as never made. The client's money is gone, the posting never publishes,
+and the only visible symptom is a payment the app swears never happened.
+A payment signed for the wrong chain is now rejected by name at
+`src/lib/escrow-verify.ts` rather than disappearing into that hole.
+
 ## The key
 
 `NIMIQ_ESCROW_PRIVATE_KEY` controls every NIM in escrow. If it leaks, all of it
