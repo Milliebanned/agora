@@ -11,6 +11,8 @@ import {
   Clock,
   AlertTriangle,
   XCircle,
+  UserCheck,
+  Gavel,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -28,6 +30,10 @@ interface Dispute {
   freelancerPercent?: number
   openerDecision: string | null
   respondentDecision: string | null
+  humanRequestedAt?: string | null
+  humanRuling?: string | null
+  humanRulingPercent?: number | null
+  mediator?: { displayName: string | null } | null
   amountNIM: number
   viewerRole: 'client' | 'freelancer'
   createdAt: string
@@ -51,10 +57,12 @@ export default function DisputeDetailPage() {
   const [dispute, setDispute] = useState<Dispute | null>(null)
   const [loading, setLoading] = useState(true)
   const [mediating, setMediating] = useState(false)
-  const [accepting, setAccepting] = useState<'accept' | 'reject' | null>(null)
+  const [accepting, setAccepting] = useState<'accept' | 'reject' | 'human' | 'rule' | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [user, setUser] = useState<{ id: string } | null>(null)
+  const [user, setUser] = useState<{ id: string; isPlatformMediator?: boolean } | null>(null)
+  const [ruling, setRuling] = useState('')
+  const [rulingPercent, setRulingPercent] = useState('50')
 
   useEffect(() => {
     const load = async () => {
@@ -133,6 +141,52 @@ export default function DisputeDetailPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setAccepting(null)
+    }
+  }
+
+  // Either party can ask for a person. Needing the other side's agreement to
+  // ask for help would defeat the point of asking.
+  const requestHuman = async () => {
+    setAccepting('human')
+    setError('')
+    setNotice('')
+    try {
+      const res = await fetch(`/api/disputes/${disputeId}/human`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ? `${data.error} — ${data.detail}` : data.error)
+      setNotice(data.message)
+      const fresh = await fetch(`/api/disputes/${disputeId}`, { credentials: 'include' })
+      if (fresh.ok) setDispute(await fresh.json())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not request a human mediator')
+    } finally {
+      setAccepting(null)
+    }
+  }
+
+  const submitRuling = async () => {
+    setAccepting('rule')
+    setError('')
+    setNotice('')
+    try {
+      const res = await fetch(`/api/disputes/${disputeId}/rule`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ percent: Number(rulingPercent), reasoning: ruling }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ? `${data.error} — ${data.detail}` : data.error)
+      setNotice(data.message)
+      const fresh = await fetch(`/api/disputes/${disputeId}`, { credentials: 'include' })
+      if (fresh.ok) setDispute(await fresh.json())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not record the ruling')
     } finally {
       setAccepting(null)
     }
@@ -291,11 +345,28 @@ export default function DisputeDetailPage() {
             {dispute.status === 'under_review' && dispute.recommendedOutcome === 'escalate' && (
               <div className="flex gap-2.5 rounded-md border border-destructive/25 bg-destructive/[0.06] p-4">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <p className="text-[13px] leading-relaxed text-secondary-foreground">
-                  The mediator judged the evidence too thin to decide, so there is nothing to
-                  accept. The escrow stays held. Add whatever is missing to the deal chat and
-                  request a fresh verdict, or settle it between yourselves.
-                </p>
+                <div>
+                  <p className="text-[13px] leading-relaxed text-secondary-foreground">
+                    The mediator judged the evidence too thin to decide, so there is nothing to
+                    accept. The escrow stays held. Add whatever is missing to the deal chat and
+                    request a fresh verdict, or ask a person to settle it.
+                  </p>
+                  {isParty && !dispute.humanRequestedAt && (
+                    <Button
+                      variant="secondary"
+                      className="mt-3"
+                      onClick={requestHuman}
+                      disabled={accepting !== null}
+                    >
+                      {accepting === 'human' ? (
+                        <Spinner className="h-4 w-4" />
+                      ) : (
+                        <UserCheck className="h-4 w-4" />
+                      )}
+                      Ask for a human mediator
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -389,10 +460,135 @@ export default function DisputeDetailPage() {
                   </div>
                 </div>
                 {isParty && (
-                  <Button className="mt-4" onClick={handleGetVerdict} disabled={mediating}>
-                    {mediating ? <Spinner className="h-4 w-4" /> : <Scale className="h-4 w-4" />}
-                    {mediating ? 'Reviewing the case again' : 'Request a fresh verdict'}
-                  </Button>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button onClick={handleGetVerdict} disabled={mediating || accepting !== null}>
+                      {mediating ? <Spinner className="h-4 w-4" /> : <Scale className="h-4 w-4" />}
+                      {mediating ? 'Reviewing the case again' : 'Request a fresh verdict'}
+                    </Button>
+                    {!dispute.humanRequestedAt && (
+                      <Button
+                        variant="secondary"
+                        onClick={requestHuman}
+                        disabled={mediating || accepting !== null}
+                      >
+                        {accepting === 'human' ? (
+                          <Spinner className="h-4 w-4" />
+                        ) : (
+                          <UserCheck className="h-4 w-4" />
+                        )}
+                        Ask for a human mediator
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {dispute.status === 'human_review' && (
+              <div className="rounded-md border border-violet/25 bg-violet/[0.06] p-4">
+                <div className="flex gap-2.5">
+                  <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-violet" />
+                  <div>
+                    <p className="text-[13px] font-medium text-violet">With a human mediator</p>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-secondary-foreground">
+                      A person is reviewing this case against the requirements, the work and this
+                      chat. Their ruling is binding and releases the escrow, so add anything they
+                      should see to the deal chat now. The escrow stays held until they decide.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* The mediator's desk. Only rendered for a wallet named in
+                PLATFORM_ADMIN_ADDRESSES, and the route checks again — this is
+                convenience, not the access control. */}
+            {user?.isPlatformMediator && !isParty && dispute.status !== 'resolved' && (
+              <div className="rounded-md border border-accent/25 bg-accent/[0.06] p-4">
+                <p className="text-[13px] font-medium text-accent">Rule on this dispute</p>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-secondary-foreground">
+                  Your decision is <span className="font-medium">binding and immediate</span> — it
+                  pays out on-chain the moment you submit, with no acceptance step and no undo.
+                  Both parties will read your reasoning.
+                </p>
+
+                <label className="mt-4 block text-[13px] font-medium text-secondary-foreground">
+                  Freelancer’s share: {rulingPercent}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={rulingPercent}
+                  onChange={(e) => setRulingPercent(e.target.value)}
+                  className="mt-2 w-full accent-accent"
+                />
+                <div className="mt-1 flex justify-between text-[12px] text-muted-foreground">
+                  <span>
+                    {((dispute.amountNIM * Number(rulingPercent)) / 100).toFixed(2)} NIM to the
+                    freelancer
+                  </span>
+                  <span>
+                    {(dispute.amountNIM - (dispute.amountNIM * Number(rulingPercent)) / 100).toFixed(
+                      2,
+                    )}{' '}
+                    NIM to the client
+                  </span>
+                </div>
+
+                <textarea
+                  value={ruling}
+                  onChange={(e) => setRuling(e.target.value)}
+                  rows={4}
+                  placeholder="What decided it? Cite the deliverables, the dates, the work as submitted. Both parties read this, and one of them is losing money because of it."
+                  className="mt-4 w-full rounded-md border border-border bg-card p-3 text-[14px] leading-relaxed outline-none transition-colors focus:border-accent"
+                />
+
+                <Button
+                  className="mt-3"
+                  onClick={submitRuling}
+                  disabled={accepting !== null || ruling.trim().length < 20}
+                >
+                  {accepting === 'rule' ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <Gavel className="h-4 w-4" />
+                  )}
+                  {accepting === 'rule' ? 'Settling on-chain' : 'Issue binding ruling'}
+                </Button>
+                {ruling.trim().length < 20 && (
+                  <p className="mt-2 text-[12px] text-subtle-foreground">
+                    Reasoning is required — at least a sentence.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {user?.isPlatformMediator && isParty && dispute.status !== 'resolved' && (
+              <div className="rounded-md border border-border bg-surface p-4">
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  You are a platform mediator, but you are also a party to this dispute, so you
+                  cannot rule on it. Another mediator has to take this one.
+                </p>
+              </div>
+            )}
+
+            {dispute.humanRuling && (
+              <div className="rounded-md border border-success/25 bg-success/[0.06] p-4">
+                <div className="flex items-center gap-2">
+                  <Gavel className="h-4 w-4 shrink-0 text-success" />
+                  <p className="text-[13px] font-medium text-success">
+                    Human mediator’s ruling — {dispute.humanRulingPercent}% to the freelancer
+                  </p>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-secondary-foreground">
+                  {dispute.humanRuling}
+                </p>
+                {dispute.mediator?.displayName && (
+                  <p className="mt-2 text-[12px] text-muted-foreground">
+                    Ruled by {dispute.mediator.displayName}. This decision was final.
+                  </p>
                 )}
               </div>
             )}
