@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { isPlatformAdmin } from '@/lib/admin'
 import {
   isValidCategory,
   sanitizeAttachments,
@@ -30,7 +31,9 @@ export async function GET(
         buyer: { select: { id: true, address: true, displayName: true } },
         seller: { select: { id: true, address: true, displayName: true } },
         escrowTransactions: { orderBy: { createdAt: 'desc' } },
-        disputes: { select: { id: true, status: true, createdAt: true } },
+        disputes: {
+          select: { id: true, status: true, createdAt: true, humanRequestedAt: true },
+        },
         proposals: {
           include: {
             freelancer: {
@@ -60,9 +63,24 @@ export async function GET(
     const isFreelancer = opportunity.sellerId === user.userId
     const isParty = isClient || isFreelancer
 
+    // A platform mediator can read a deal they have been asked to rule on, and
+    // only such a deal. Ruling on a case without seeing the deliverables, the
+    // submitted work and the chat would be ruling on nothing — but that is an
+    // argument for access to *this* deal, not to the platform's private
+    // postings at large, so it is scoped to a dispute someone actually referred
+    // to a human and that is still open.
+    const me = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: { address: true },
+    })
+    const referredForMediation = opportunity.disputes.some(
+      (d) => d.humanRequestedAt !== null && d.status !== 'resolved',
+    )
+    const isMediator = !isParty && isPlatformAdmin(me?.address) && referredForMediation
+
     // A draft is nobody's business but its author's, and once a freelancer is
     // engaged the posting leaves the public board with them.
-    if (!isParty && opportunity.status !== 'open') {
+    if (!isParty && !isMediator && opportunity.status !== 'open') {
       return NextResponse.json({ error: 'Not visible' }, { status: 403 })
     }
 
@@ -79,12 +97,18 @@ export async function GET(
         isClient,
         isFreelancer,
         isParty,
+        // Read-only. A mediator is deliberately not a party: they can see
+        // everything the case turns on and act on none of it, because
+        // submitting work or approving it is not what they were asked to do.
+        isMediator,
       },
       proposals: isClient
         ? proposals
         : proposals.filter((p) => p.freelancerId === user.userId),
       proposalCount: proposals.length,
-      messages: isParty ? messages : [],
+      // The chat is evidence. A mediator asked to rule on the case reads it for
+      // the same reason the AI mediator is given it.
+      messages: isParty || isMediator ? messages : [],
     })
   } catch (error) {
     console.error('Get opportunity error:', error)

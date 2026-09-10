@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { isPlatformAdmin } from '@/lib/admin'
 
 // Chat is private and it opens late: only the client and the freelancer they
 // accepted can post, and only once that acceptance has happened. Before then
@@ -80,7 +81,25 @@ export async function GET(request: NextRequest) {
     }
 
     if (agreement.buyerId !== user.userId && agreement.sellerId !== user.userId) {
-      return NextResponse.json({ error: 'Not a party to this agreement' }, { status: 403 })
+      // A platform mediator reads the chat of a case referred to them, because
+      // it is the evidence they are ruling on. Reading only — posting stays
+      // with the two parties, so a mediator cannot become a participant in the
+      // conversation they are judging. Their reasoning reaches the parties as
+      // a system message when they rule.
+      const me = await prisma.user.findUnique({
+        where: { id: user.userId },
+        select: { address: true },
+      })
+      const referred = await prisma.dispute.count({
+        where: {
+          agreementId,
+          humanRequestedAt: { not: null },
+          status: { not: 'resolved' },
+        },
+      })
+      if (!isPlatformAdmin(me?.address) || referred === 0) {
+        return NextResponse.json({ error: 'Not a party to this agreement' }, { status: 403 })
+      }
     }
 
     const messages = await prisma.message.findMany({

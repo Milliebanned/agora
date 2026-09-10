@@ -134,6 +134,15 @@ export default function ChatPanel({ opportunity }: { opportunity: OpportunityDet
         <div ref={endRef} />
       </div>
 
+      {/* A mediator reads the conversation they are judging and does not join
+          it. Their reasoning reaches both parties as a system message when they
+          rule, which is the accountable place for it. */}
+      {opportunity.viewer.isMediator && !opportunity.viewer.isParty ? (
+        <p className="border-t border-border px-5 py-4 text-[12px] leading-relaxed text-muted-foreground">
+          You are reading this as a mediator. You cannot post here — your reasoning is published to
+          both parties when you issue your ruling.
+        </p>
+      ) : (
       <form onSubmit={send} className="flex gap-2 border-t border-border px-5 py-4">
         <Input
           value={draft}
@@ -147,6 +156,7 @@ export default function ChatPanel({ opportunity }: { opportunity: OpportunityDet
           {sending ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />}
         </Button>
       </form>
+      )}
       {error && <p className="px-5 pb-4 text-[13px] text-destructive">{error}</p>}
     </Card>
   )
