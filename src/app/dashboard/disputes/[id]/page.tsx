@@ -19,6 +19,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge, StatusBadge, type BadgeProps } from '@/components/ui/badge'
 import { PageLoading, Spinner } from '@/components/ui/page'
+import { useToast } from '@/components/ui/toast'
+import { useSession } from '@/components/SessionProvider'
+import { FALLBACK_ERROR } from '@/lib/messages'
 
 interface Dispute {
   id: string
@@ -58,9 +61,8 @@ export default function DisputeDetailPage() {
   const [loading, setLoading] = useState(true)
   const [mediating, setMediating] = useState(false)
   const [accepting, setAccepting] = useState<'accept' | 'reject' | 'human' | 'rule' | null>(null)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [user, setUser] = useState<{ id: string; isPlatformMediator?: boolean } | null>(null)
+  const toast = useToast()
+  const { user } = useSession()
   const [ruling, setRuling] = useState('')
   const [rulingPercent, setRulingPercent] = useState('50')
 
@@ -73,9 +75,6 @@ export default function DisputeDetailPage() {
           return
         }
         setDispute(await res.json())
-
-        const sessionRes = await fetch('/api/auth/session', { credentials: 'include' })
-        if (sessionRes.ok) setUser((await sessionRes.json()).user)
       } catch (err) {
         console.error('Failed to load dispute:', err)
       } finally {
@@ -88,7 +87,6 @@ export default function DisputeDetailPage() {
   const handleGetVerdict = async () => {
     if (!dispute) return
     setMediating(true)
-    setError('')
     try {
       const res = await fetch(`/api/disputes/${disputeId}/resolve`, {
         method: 'POST',
@@ -105,7 +103,7 @@ export default function DisputeDetailPage() {
       }
       setDispute(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      toast.error(err instanceof Error ? err.message : FALLBACK_ERROR)
     } finally {
       setMediating(false)
     }
@@ -113,8 +111,6 @@ export default function DisputeDetailPage() {
 
   const handleDecision = async (decision: 'accept' | 'reject') => {
     setAccepting(decision)
-    setError('')
-    setNotice('')
     try {
       const res = await fetch(`/api/disputes/${disputeId}/settle`, {
         method: 'POST',
@@ -123,24 +119,20 @@ export default function DisputeDetailPage() {
         body: JSON.stringify({ decision }),
       })
       const data = await res.json()
-      if (res.ok) setNotice(data.message)
-      else setError(data.error ?? 'Your answer could not be recorded.')
 
-      // Re-read either way. If both parties accepted at the same moment one of
-      // them is told a payout is already in progress — which is true, and the
-      // refreshed dispute shows it settled rather than leaving them on an error
-      // for something that worked.
+      // Re-read before saying anything. If both parties accepted at the same
+      // moment, this side's write can fail while the payout it asked for went
+      // through — the refreshed dispute is what tells the truth about that.
       const fresh = await fetch(`/api/disputes/${disputeId}`, { credentials: 'include' })
-      if (fresh.ok) {
-        const next = await fresh.json()
-        setDispute(next)
-        if (!res.ok && next.status === 'resolved') {
-          setError('')
-          setNotice('This dispute is settled — the escrow has been paid out on-chain.')
-        }
-      }
+      const next = fresh.ok ? await fresh.json() : null
+      if (next) setDispute(next)
+
+      if (res.ok) toast.success(data.message)
+      else if (next?.status === 'resolved')
+        toast.success('This dispute is settled — the escrow has been paid out on-chain.')
+      else toast.error(data.error ?? 'Your answer could not be recorded.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      toast.error(err instanceof Error ? err.message : FALLBACK_ERROR)
     } finally {
       setAccepting(null)
     }
@@ -150,8 +142,6 @@ export default function DisputeDetailPage() {
   // ask for help would defeat the point of asking.
   const requestHuman = async () => {
     setAccepting('human')
-    setError('')
-    setNotice('')
     try {
       const res = await fetch(`/api/disputes/${disputeId}/human`, {
         method: 'POST',
@@ -159,11 +149,11 @@ export default function DisputeDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail ? `${data.error} — ${data.detail}` : data.error)
-      setNotice(data.message)
+      toast.success(data.message)
       const fresh = await fetch(`/api/disputes/${disputeId}`, { credentials: 'include' })
       if (fresh.ok) setDispute(await fresh.json())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not request a human mediator')
+      toast.error(err instanceof Error ? err.message : 'Could not request a human mediator')
     } finally {
       setAccepting(null)
     }
@@ -171,8 +161,6 @@ export default function DisputeDetailPage() {
 
   const submitRuling = async () => {
     setAccepting('rule')
-    setError('')
-    setNotice('')
     try {
       const res = await fetch(`/api/disputes/${disputeId}/rule`, {
         method: 'POST',
@@ -182,11 +170,11 @@ export default function DisputeDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail ? `${data.error} — ${data.detail}` : data.error)
-      setNotice(data.message)
+      toast.success(data.message)
       const fresh = await fetch(`/api/disputes/${disputeId}`, { credentials: 'include' })
       if (fresh.ok) setDispute(await fresh.json())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not record the ruling')
+      toast.error(err instanceof Error ? err.message : 'Could not record the ruling')
     } finally {
       setAccepting(null)
     }
@@ -275,7 +263,6 @@ export default function DisputeDetailPage() {
               {mediating ? <Spinner className="h-4 w-4" /> : <Scale className="h-4 w-4" />}
               {mediating ? 'Reviewing the case' : 'Request verdict'}
             </Button>
-            {error && <p className="text-[13px] text-destructive">{error}</p>}
           </div>
         </Card>
       )}
@@ -615,9 +602,6 @@ export default function DisputeDetailPage() {
                 </p>
               </div>
             )}
-
-            {notice && <p className="text-[13px] text-success">{notice}</p>}
-            {error && <p className="text-[13px] text-destructive">{error}</p>}
           </div>
         </Card>
       )}

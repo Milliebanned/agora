@@ -134,29 +134,27 @@ export default function OnboardingPage() {
                 aria-pressed={active}
                 className={`rounded-lg bg-card p-6 text-left transition-colors ${
                   active
-                    ? 'shadow-[inset_0_0_0_1px_var(--accent)] bg-surface'
+                    ? 'shadow-[inset_0_0_0_1px_#3bb143] bg-surface'
                     : 'shadow-hairline hover:bg-surface'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                      active ? 'bg-accent' : 'bg-white/[0.04]'
+                      active ? 'bg-[#3bb143]' : 'bg-white/[0.04]'
                     }`}
                   >
                     <option.icon
-                      className={`h-4 w-4 ${active ? 'text-accent-foreground' : 'text-muted-foreground'}`}
+                      className={`h-4 w-4 ${active ? 'text-white' : 'text-muted-foreground'}`}
                       strokeWidth={2}
                     />
                   </div>
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-full transition-colors ${
-                      active ? 'bg-accent' : 'shadow-hairline'
+                      active ? 'bg-[#3bb143]' : 'shadow-hairline'
                     }`}
                   >
-                    {active && (
-                      <Check className="h-3 w-3 text-accent-foreground" strokeWidth={3} />
-                    )}
+                    {active && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
                   </span>
                 </div>
 

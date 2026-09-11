@@ -7,6 +7,7 @@ import { FileText, Plus, Compass } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/badge'
 import { PageHeader, EmptyState, PageLoading } from '@/components/ui/page'
+import { useSession } from '@/components/SessionProvider'
 import { categoryLabel } from '@/lib/opportunities'
 import { cn } from '@/lib/utils'
 
@@ -29,19 +30,29 @@ interface Deal {
 
 const FILTERS = ['all', 'draft', 'open', 'locked', 'submitted', 'completed', 'disputed', 'settled']
 
+// A deal is past only once nothing can happen on it again. `completed` stays
+// current on purpose: the work is approved but the escrow still has to be
+// claimed, so it is the one status where money is left on the table.
+const CLOSED_STATUSES = new Set(['settled', 'refunded', 'cancelled'])
+
 export default function DealsPage() {
   const router = useRouter()
+  const { user, role } = useSession()
   const [deals, setDeals] = useState<Deal[]>([])
-  const [me, setMe] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
 
-  useEffect(() => {
-    fetch('/api/auth/session', { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setMe(data?.user?.id ?? null))
-      .catch(() => {})
-  }, [])
+  const me = user?.id ?? null
+  const isFreelancer = role === 'provider'
+
+  const findWorkButton = (
+    <Link href="/dashboard/opportunities">
+      <Button>
+        <Compass className="h-4 w-4" />
+        Find work
+      </Button>
+    </Link>
+  )
 
   useEffect(() => {
     const load = async () => {
@@ -71,12 +82,16 @@ export default function DealsPage() {
         title="Deals"
         description="Opportunities you posted and work you were selected for, from draft to settled."
         action={
-          <Link href="/dashboard/opportunities/new">
-            <Button>
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-              Post opportunity
-            </Button>
-          </Link>
+          isFreelancer ? (
+            findWorkButton
+          ) : (
+            <Link href="/dashboard/opportunities/new">
+              <Button>
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                Post opportunity
+              </Button>
+            </Link>
+          )
         }
       />
 
@@ -103,27 +118,94 @@ export default function DealsPage() {
         <EmptyState
           icon={FileText}
           title={filter === 'all' ? 'No deals yet' : `Nothing ${filter}`}
-          description="Post work with the budget committed up front, or find an opportunity that already has its escrow funded."
+          description={
+            isFreelancer
+              ? 'Every posting on the board has its budget committed to escrow already, so the money is there before you write a proposal.'
+              : 'Post work with the budget committed up front, or find an opportunity that already has its escrow funded.'
+          }
           action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Link href="/dashboard/opportunities/new">
-                <Button>
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Post opportunity
-                </Button>
-              </Link>
-              <Link href="/dashboard/opportunities">
-                <Button variant="secondary">
-                  <Compass className="h-4 w-4" />
-                  Browse the board
-                </Button>
-              </Link>
-            </div>
+            isFreelancer ? (
+              findWorkButton
+            ) : (
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link href="/dashboard/opportunities/new">
+                  <Button>
+                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    Post opportunity
+                  </Button>
+                </Link>
+                <Link href="/dashboard/opportunities">
+                  <Button variant="secondary">
+                    <Compass className="h-4 w-4" />
+                    Browse the board
+                  </Button>
+                </Link>
+              </div>
+            )
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-lg shadow-hairline">
-          {deals.map((deal, i) => {
+        <DealSections deals={deals} me={me} isFreelancer={isFreelancer} />
+      )}
+    </>
+  )
+}
+
+// Current and past kept apart, so "what am I on the hook for" never has to be
+// read out of a single undifferentiated list.
+function DealSections({
+  deals,
+  me,
+  isFreelancer,
+}: {
+  deals: Deal[]
+  me: string | null
+  isFreelancer: boolean
+}) {
+  const current = deals.filter((d) => !CLOSED_STATUSES.has(d.status))
+  const past = deals.filter((d) => CLOSED_STATUSES.has(d.status))
+
+  return (
+    <div className="space-y-8">
+      <section>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-[15px] font-medium tracking-body">Current</h2>
+          <span className="text-[13px] text-subtle-foreground">
+            {current.length} {current.length === 1 ? 'deal' : 'deals'}
+          </span>
+        </div>
+        {current.length === 0 ? (
+          <div className="rounded-lg bg-card px-4 py-8 text-center shadow-hairline">
+            <p className="text-[14px] text-muted-foreground">
+              {isFreelancer
+                ? 'No work in flight right now.'
+                : 'Nothing under way right now.'}
+            </p>
+          </div>
+        ) : (
+          <DealRows deals={current} me={me} />
+        )}
+      </section>
+
+      {past.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-[15px] font-medium tracking-body">Past</h2>
+            <span className="text-[13px] text-subtle-foreground">
+              {past.length} {past.length === 1 ? 'deal' : 'deals'}
+            </span>
+          </div>
+          <DealRows deals={past} me={me} />
+        </section>
+      )}
+    </div>
+  )
+}
+
+function DealRows({ deals, me }: { deals: Deal[]; me: string | null }) {
+  return (
+    <div className="overflow-hidden rounded-lg shadow-hairline">
+      {deals.map((deal, i) => {
             const asClient = deal.buyerId === me
             const counterparty = asClient
               ? deal.seller?.displayName ?? 'No freelancer yet'
@@ -168,8 +250,6 @@ export default function DealsPage() {
               </Link>
             )
           })}
-        </div>
-      )}
-    </>
+    </div>
   )
 }

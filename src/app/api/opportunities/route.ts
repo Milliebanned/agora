@@ -32,6 +32,11 @@ export async function GET(request: NextRequest) {
       where.buyerId = user.userId
     } else if (scope === 'assigned') {
       where.sellerId = user.userId
+    } else if (scope === 'applied') {
+      // Everything this user has pitched for. `assigned` only covers work
+      // already won, so without this a freelancer has nowhere to see a proposal
+      // that is still pending — or one that was turned down.
+      where.proposals = { some: { freelancerId: user.userId } }
     } else {
       where.status = 'open'
       where.publishedAt = { not: null }
@@ -56,6 +61,23 @@ export async function GET(request: NextRequest) {
         buyer: { select: { id: true, address: true, displayName: true } },
         seller: { select: { id: true, address: true, displayName: true } },
         _count: { select: { proposals: true } },
+        // Only the caller's own pitch, and only where they asked for it, so
+        // every other scope returns exactly the payload it always has. A rival
+        // bid stays private in all cases.
+        ...(scope === 'applied'
+          ? {
+              proposals: {
+                where: { freelancerId: user.userId },
+                select: {
+                  id: true,
+                  status: true,
+                  bidNIM: true,
+                  deliveryDays: true,
+                  createdAt: true,
+                },
+              },
+            }
+          : {}),
       },
       orderBy: sortOrderBy(q.get('sort')),
       take: 100,
