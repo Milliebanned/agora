@@ -107,7 +107,7 @@ export function sortOrderBy(sort: string | null) {
 // stored separately so the record can never disagree with itself.
 //
 //   unfunded  nothing paid — the posting is still a draft, invisible to anyone
-//   held      the client's payment is confirmed on-chain in the NimTrust escrow
+//   held      the client's payment is confirmed on-chain in the Agora escrow
 //             account. Real NIM has left their wallet.
 //   assigned  a freelancer is engaged and the held funds are earmarked for them
 //   released  the client approved and the funds were paid out to the freelancer
@@ -139,7 +139,7 @@ export const ESCROW_STAGE_COPY: Record<EscrowStage, { label: string; detail: str
   held: {
     label: 'Held in escrow',
     detail:
-      'The budget has left the client’s wallet and is confirmed on-chain in the NimTrust escrow account. A freelancer can see the money exists before writing a word.',
+      'The budget has left the client’s wallet and is confirmed on-chain in the Agora escrow account. A freelancer can see the money exists before writing a word.',
   },
   assigned: {
     label: 'Earmarked',

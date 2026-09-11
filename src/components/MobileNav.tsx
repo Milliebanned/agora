@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Compass, FileText, Scale, User, Lock, LogOut, Plus } from 'lucide-react'
+import { Home, Compass, FileText, Scale, User, LogOut, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// NimTrust runs inside the Nimiq Pay WebView, so the phone is the primary
+// Agora runs inside the Nimiq Pay WebView, so the phone is the primary
 // target, not a fallback. The desktop sidebar is replaced here by a top bar
 // for identity and the primary action, and a thumb-reachable bottom tab bar.
 const TABS = [
@@ -27,10 +27,9 @@ export function MobileTopBar() {
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur-xl lg:hidden">
       <Link href="/dashboard" className="flex items-center gap-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded bg-accent">
-          <Lock className="h-3.5 w-3.5 text-accent-foreground" strokeWidth={2.5} />
-        </div>
-        <span className="text-[15px] font-medium tracking-body">NimTrust</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="" className="h-6 w-6" />
+        <span className="text-[15px] font-medium tracking-body">Agora</span>
       </Link>
 
       <div className="flex items-center gap-1">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Briefcase, Check, Lock, Search, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Briefcase, Check, Search, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PageLoading, Spinner } from '@/components/ui/page'
 import { shortAddress } from '@/lib/utils'
@@ -101,10 +101,9 @@ export default function OnboardingPage() {
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-content items-center justify-between px-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-accent">
-              <Lock className="h-3.5 w-3.5 text-accent-foreground" strokeWidth={2.5} />
-            </div>
-            <span className="text-[15px] font-medium tracking-body">NimTrust</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="" className="h-6 w-6" />
+            <span className="text-[15px] font-medium tracking-body">Agora</span>
           </div>
           {address && (
             <span className="font-mono text-[12px] text-subtle-foreground">
@@ -120,7 +119,7 @@ export default function OnboardingPage() {
           Which side are you on?
         </h1>
         <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-          NimTrust has two kinds of people. Pick the one that fits — it shapes your dashboard and
+          Agora has two kinds of people. Pick the one that fits — it shapes your dashboard and
           which side of the escrow you sit on. You can switch later from your profile.
         </p>
 

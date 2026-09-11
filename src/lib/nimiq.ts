@@ -1,4 +1,4 @@
-// Nimiq SDK integration for NimTrust
+// Nimiq SDK integration for Agora
 // SPIKE TASK DAY 1: Validate exact SDK method names for HTLC transaction signing
 
 // The real SDK's init() waits for the native Nimiq Pay provider handshake,

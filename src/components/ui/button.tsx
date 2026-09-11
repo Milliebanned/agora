@@ -9,7 +9,7 @@ const buttonVariants = cva(
       variant: {
         // The single chromatic element system-wide — reserve for the primary action.
         primary:
-          'bg-accent text-accent-foreground rounded-md font-medium hover:brightness-110',
+          'bg-[#3BB143] text-white rounded-md font-medium hover:brightness-110',
         secondary:
           'bg-transparent border border-border text-secondary-foreground rounded-md font-normal hover:bg-white/[0.04] hover:border-border-strong',
         ghost: 'bg-transparent text-secondary-foreground rounded-md font-normal hover:bg-white/[0.04]',

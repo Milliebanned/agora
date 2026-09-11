@@ -2,32 +2,43 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   Compass,
-  Sparkles,
   ShieldCheck,
   Star,
   Scale,
   Wallet,
   ArrowRight,
-  Lock,
-  CheckCircle2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/page'
 import { useWalletLogin } from '@/hooks/useWalletLogin'
+import ThinkerScene from '@/components/decor/ThinkerScene'
+
+const Globe = dynamic(() => import('@/components/globe/WireframeGlobe'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="h-full w-full"
+      style={{
+        background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), transparent 70%)',
+      }}
+    />
+  ),
+})
 
 const FEATURES = [
   {
     icon: Compass,
     title: 'Funded-only opportunity board',
-    body: 'Clients post structured briefs — category, scope, deliverables, budget, timeline — and commit the budget to escrow before the posting goes public. Nothing on the board is speculative.',
+    body: 'Clients post a structured brief (category, scope, deliverables, budget, timeline) and commit the budget to escrow before the posting goes public. Nothing on the board is speculative.',
   },
   {
     icon: ShieldCheck,
-    title: 'Native HTLC escrow',
-    body: "Funds lock in Nimiq's own hashed timelock contracts. Not a custom smart contract, not a company account. Release on approval, refund on timeout.",
+    title: 'HTLC-backed escrow',
+    body: "Funds lock in a Nimiq hashed timelock contract, not a company account. Approval lets the freelancer claim it; past the timeout, the client can claim a refund.",
   },
   {
     icon: Star,
@@ -37,7 +48,7 @@ const FEATURES = [
   {
     icon: Scale,
     title: 'AI dispute mediation',
-    body: 'When a deal stalls, the mediator reads the submitted work against the original requirements, the timeline, and the full message history, then issues a reasoned verdict.',
+    body: 'When a deal stalls, the mediator reads the submitted work against the original requirements, the delivery timeline, and the recent conversation, then issues a reasoned verdict.',
   },
 ]
 
@@ -70,10 +81,9 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-content items-center justify-between px-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-accent">
-              <Lock className="h-3.5 w-3.5 text-accent-foreground" strokeWidth={2.5} />
-            </div>
-            <span className="text-[15px] font-medium tracking-body">NimTrust</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="" className="h-6 w-6" />
+            <span className="text-[15px] font-medium tracking-body">Agora</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden text-[13px] text-muted-foreground sm:block">
@@ -94,29 +104,25 @@ export default function Home() {
       </header>
 
       {/* Hero — left-aligned oversized headline, product preview floating on gradient */}
-      <section className="relative overflow-hidden border-b border-border">
+      <section className="relative overflow-hidden">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              'radial-gradient(60% 50% at 15% 0%, rgba(228,242,34,0.07) 0%, transparent 70%)',
+              'radial-gradient(60% 50% at 15% 0%, rgba(152,251,152,0.07) 0%, transparent 70%)',
           }}
         />
         <div className="relative mx-auto max-w-content px-6 pb-24 pt-20 sm:pt-28">
           <Badge tone="neutral" className="mb-6">
-            <Sparkles className="h-3 w-3" />
             Escrow-backed on Nimiq
           </Badge>
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-            <div>
-              <h1 className="max-w-2xl text-[44px] font-medium leading-[1.05] tracking-display sm:text-[64px]">
-                Trust, for deals
-                <br />
-                between strangers.
+            <div className="relative z-10">
+              <h1 className="max-w-2xl text-[44px] font-bold uppercase leading-[1.05] tracking-tight sm:text-[64px]">
+                Trust, between strangers.
               </h1>
               <p className="mt-6 max-w-xl text-body-lg font-normal text-muted-foreground">
-                NimTrust is a marketplace where the budget is locked in a Nimiq HTLC before the
-                work is even advertised — and an AI mediator settles it if the two of you cannot.
+                Hire, collaborate, and get paid with confidence.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 {signedIn ? (
@@ -143,83 +149,45 @@ export default function Home() {
               {error && <p className="mt-4 text-[13px] text-destructive">{error}</p>}
             </div>
 
-            {/* Product preview — real UI, framed, per the reference's screenshot-first language */}
-            <div className="relative">
-              <div className="rounded-lg bg-card shadow-hairline shadow-float">
-                <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
-                  <div className="h-2 w-2 rounded-full bg-white/10" />
-                  <div className="h-2 w-2 rounded-full bg-white/10" />
-                  <div className="h-2 w-2 rounded-full bg-white/10" />
-                  <span className="ml-2 font-mono text-[11px] text-subtle-foreground">
-                    NMT-104
-                  </span>
-                </div>
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[15px] font-medium">Landing page redesign</p>
-                      <p className="mt-1 text-[13px] text-muted-foreground">
-                        with 0xF4…9c2b
-                      </p>
-                    </div>
-                    <Badge tone="info">Active</Badge>
-                  </div>
-
-                  <div className="mt-5 flex items-center justify-between rounded-md bg-white/[0.03] px-3.5 py-3">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-accent" />
-                      <span className="text-[13px] text-secondary-foreground">Locked in escrow</span>
-                    </div>
-                    <span className="font-mono text-[13px] tabular-nums text-foreground">
-                      500.00 NIM
-                    </span>
-                  </div>
-
-                  <div className="mt-5 space-y-3">
-                    {[
-                      ['Wireframes approved', true],
-                      ['Design system delivered', true],
-                      ['Final handoff', false],
-                    ].map(([label, done]) => (
-                      <div key={label as string} className="flex items-center gap-2.5">
-                        <CheckCircle2
-                          className={`h-4 w-4 shrink-0 ${done ? 'text-success' : 'text-subtle-foreground'}`}
-                        />
-                        <span
-                          className={`text-[13px] ${done ? 'text-secondary-foreground' : 'text-subtle-foreground'}`}
-                        >
-                          {label as string}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-5 border-t border-border pt-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] text-muted-foreground">Counterparty trust</span>
-                      <span className="font-mono text-[12px] tabular-nums text-success">92 / 100</span>
-                    </div>
-                    <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                      <div className="h-full w-[92%] rounded-full bg-success" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {/* Right visual — rotating wireframe globe. On mobile it sits behind the
+                text/buttons as a background layer; from lg up it's back in the grid,
+                bleeding past the section edge as before. */}
+            <div className="pointer-events-none absolute inset-0 z-0 opacity-60 lg:pointer-events-auto lg:relative lg:inset-auto lg:z-auto lg:opacity-100 lg:-mr-24 lg:h-[640px]">
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    'radial-gradient(50% 50% at 60% 45%, rgba(152,251,152,0.08) 0%, transparent 70%)',
+                }}
+              />
+              <Globe className="absolute inset-0 h-full w-full" />
             </div>
           </div>
         </div>
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+          style={{ background: 'linear-gradient(to bottom, transparent, var(--background))' }}
+        />
       </section>
 
       {/* Features */}
-      <section className="border-b border-border">
-        <div className="mx-auto max-w-content px-6 py-24">
+      <section className="relative overflow-hidden border-b border-border">
+        <ThinkerScene
+          className="absolute inset-0 h-full w-full opacity-70"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent, black 12%, black 88%, transparent)',
+            WebkitMaskImage:
+              'linear-gradient(to bottom, transparent, black 12%, black 88%, transparent)',
+          }}
+        />
+        <div className="pointer-events-none relative z-10 mx-auto max-w-content px-6 py-24">
           <h2 className="max-w-xl text-heading-sm font-medium tracking-heading">
             Everything a handshake deal was missing.
           </h2>
           <div className="mt-14 grid gap-px overflow-hidden rounded-lg bg-border sm:grid-cols-2">
             {FEATURES.map((f) => (
               <div key={f.title} className="bg-card p-6">
-                <f.icon className="h-4 w-4 text-accent" />
+                <f.icon className="h-4 w-4 text-[#98fb98]" />
                 <h3 className="mt-4 text-[15px] font-medium tracking-body">{f.title}</h3>
                 <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">{f.body}</p>
               </div>
@@ -269,7 +237,7 @@ export default function Home() {
 
       <footer>
         <div className="mx-auto flex max-w-content flex-col gap-2 px-6 py-10 text-[13px] text-subtle-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>NimTrust — AI-powered trust layer for P2P commerce on Nimiq</span>
+          <span>Agora, the AI-powered trust layer for P2P commerce on Nimiq</span>
           <span className="font-mono">Nimiq Mini Apps</span>
         </div>
       </footer>
