@@ -83,14 +83,14 @@ export async function POST(
     const coverLetter = String(body.coverLetter ?? '').trim()
     const bidNIM = Number(body.bidNIM)
     const deliveryDays = Number(body.deliveryDays)
-    const budget = Number(opportunity.budgetNIM ?? opportunity.amountNIM)
 
     const problems: string[] = []
     if (coverLetter.length < 30) problems.push('Tell the client how you would approach this (30+ characters)')
     if (!Number.isFinite(bidNIM) || bidNIM <= 0) problems.push('Bid must be above 0 NIM')
-    // The escrow is already committed at the posted budget, so a bid above it
-    // is money that does not exist.
-    if (bidNIM > budget) problems.push(`Bid cannot exceed the ${budget} NIM budget`)
+    // A bid above the posted budget is allowed — the freelancer is naming
+    // what the work is actually worth to them. Accepting one asks the client
+    // to fund the difference as part of accepting it, so nothing above the
+    // funded amount can ever lock without the escrow actually covering it.
     if (!Number.isInteger(deliveryDays) || deliveryDays < 1)
       problems.push('Delivery time must be at least 1 day')
 

@@ -71,9 +71,16 @@ export async function GET(request: NextRequest) {
 
     // Refunds are counted alongside claims: a mediated settlement pays the
     // client as well as the freelancer, and a stuck refund is just as much
-    // somebody waiting on money that never arrived.
+    // somebody waiting on money that never arrived. 'excess_refund' is the
+    // same case at proposal-acceptance time (a bid came in under budget);
+    // 'topup' never pays anyone (it's money coming in, not out) but a
+    // pending/failed row there still means a client's top-up was accepted
+    // for a deal that never finished locking, which is worth a human's eyes.
     const stuck = await prisma.escrowTransaction.count({
-      where: { type: { in: ['claim', 'refund'] }, status: { in: ['pending', 'failed'] } },
+      where: {
+        type: { in: ['claim', 'refund', 'excess_refund', 'topup'] },
+        status: { in: ['pending', 'failed'] },
+      },
     })
 
     return NextResponse.json({

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input, Textarea } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/page'
 import { formatDate, shortAddress, cn } from '@/lib/utils'
-import { getBlockNumber } from '@/lib/nimiq'
+import { getBlockNumber, sendBasicTransaction } from '@/lib/nimiq'
 import { MESSAGES } from '@/lib/messages'
 import type { OpportunityDetail, ProposalRow } from './types'
 
@@ -73,11 +73,44 @@ function ClientView({
 }) {
   const [busy, setBusy] = useState<string | null>(null)
   const open = opportunity.status === 'open'
+  const funded = Number(opportunity.amountNIM)
 
   const decide = async (proposal: ProposalRow, action: 'accept' | 'reject') => {
     setBusy(proposal.id)
     onError('')
     try {
+      const bid = Number(proposal.bidNIM)
+      const topupNeeded = action === 'accept' ? Math.max(0, bid - funded) : 0
+
+      let serialized: string | undefined
+      let txHash: string | undefined
+
+      // A bid above the funded budget: pay the gap into escrow first, as one
+      // continuous action with accepting — there is no separate "commit, then
+      // fund later" step, so the deal can never lock against money that isn't
+      // actually there.
+      if (topupNeeded > 0) {
+        const destRes = await fetch(
+          `/api/opportunities/${opportunity.id}/escrow?amountNIM=${topupNeeded}`,
+          { credentials: 'include' },
+        )
+        const destination = await destRes.json().catch(() => null)
+        if (!destRes.ok) {
+          throw new Error(destination?.error ?? 'Could not look up where to send the top-up')
+        }
+
+        const transfer = await sendBasicTransaction({
+          recipient: destination.escrowAddress,
+          value: destination.amountLuna,
+        })
+        if (!transfer.ok) {
+          onError(transfer.reason ?? 'The wallet did not send the top-up payment.')
+          return
+        }
+        serialized = transfer.serialized ?? undefined
+        txHash = transfer.txHash ?? undefined
+      }
+
       // The head of the chain comes from the device, because the timeout the
       // HTLC will enforce is measured in blocks, not wall-clock time.
       const currentBlock = action === 'accept' ? await getBlockNumber() : undefined
@@ -87,16 +120,36 @@ function ClientView({
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ action, currentBlock }),
+          body: JSON.stringify({ action, currentBlock, serialized, txHash }),
         },
       )
       const body = await res.json().catch(() => null)
+
+      if (res.status === 202 && body?.pending) {
+        // The top-up landed in the mempool but is not in a block yet. Nothing
+        // failed and nothing should be paid again — just try the same accept
+        // once it has confirmed.
+        onNotice(body.message)
+        return
+      }
       if (!res.ok) throw new Error(body?.error ?? `Request failed (${res.status})`)
-      onNotice(
-        action === 'accept'
-          ? `${proposal.freelancer.displayName ?? 'The freelancer'} is in. Create the HTLC to lock ${Number(proposal.bidNIM).toFixed(2)} NIM on-chain — the chat is open in the meantime.`
-          : MESSAGES.proposalDeclined,
-      )
+
+      if (action === 'accept') {
+        const name = proposal.freelancer.displayName ?? 'The freelancer'
+        let message = `${name} is in. Create the HTLC to lock ${bid.toFixed(2)} NIM on-chain — the chat is open in the meantime.`
+        if (topupNeeded > 0) {
+          message += ` You funded the extra ${topupNeeded.toFixed(2)} NIM to make it happen.`
+        } else if (body?.refund?.ok) {
+          message += ` ${Number(body.refund.amountNIM).toFixed(2)} NIM was refunded to you — the accepted bid came in under budget.`
+        } else if (body?.refund && !body.refund.ok) {
+          onError(
+            `Accepted, but the ${Number(body.refund.amountNIM).toFixed(2)} NIM refund for the difference could not be sent automatically — it will be sent by hand shortly.`,
+          )
+        }
+        onNotice(message)
+      } else {
+        onNotice(MESSAGES.proposalDeclined)
+      }
       await onChanged()
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Could not update the proposal')
@@ -158,23 +211,42 @@ function ClientView({
                 {p.coverLetter}
               </p>
 
-              {open && p.status === 'pending' && (
-                <div className="mt-3.5 flex gap-2">
-                  <Button size="sm" disabled={busy !== null} onClick={() => decide(p, 'accept')}>
-                    {busy === p.id ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
-                    Accept & lock escrow
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy !== null}
-                    onClick={() => decide(p, 'reject')}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Decline
-                  </Button>
-                </div>
-              )}
+              {(() => {
+                const topup = Math.max(0, Number(p.bidNIM) - funded)
+                return (
+                  <>
+                    {topup > 0 && p.status === 'pending' && (
+                      <p className="mt-2 text-[12px] text-[#98fb98]">
+                        {topup.toFixed(2)} NIM above what&apos;s funded — accepting will ask you to
+                        pay the difference.
+                      </p>
+                    )}
+                    {open && p.status === 'pending' && (
+                      <div className="mt-3.5 flex gap-2">
+                        <Button size="sm" disabled={busy !== null} onClick={() => decide(p, 'accept')}>
+                          {busy === p.id ? (
+                            <Spinner className="h-3.5 w-3.5" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                          {topup > 0
+                            ? `Fund ${topup.toFixed(2)} NIM & accept`
+                            : 'Accept & lock escrow'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy !== null}
+                          onClick={() => decide(p, 'reject')}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Decline
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           ))}
         </div>
@@ -297,15 +369,21 @@ function FreelancerView({
               type="number"
               inputMode="decimal"
               min="1"
-              max={budget}
               step="any"
               value={bid}
               onChange={(e) => setBid(e.target.value)}
               className="mt-2"
               required
             />
-            <p className="mt-1 text-[12px] text-subtle-foreground">
-              Up to the {budget} NIM already in escrow
+            <p
+              className={cn(
+                'mt-1 text-[12px]',
+                Number(bid) > budget ? 'text-[#98fb98]' : 'text-subtle-foreground',
+              )}
+            >
+              {Number(bid) > budget
+                ? `${(Number(bid) - budget).toFixed(2)} NIM above the ${budget} NIM budget — accepting this will ask the client to fund the difference.`
+                : `Up to the ${budget} NIM already in escrow, or ask for more if the job is worth it.`}
             </p>
           </div>
           <div>
