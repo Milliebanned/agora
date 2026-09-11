@@ -37,11 +37,23 @@ export async function GET(
       return NextResponse.json({ error: 'Only the client funds this escrow' }, { status: 403 })
     }
 
+    // A caller can ask for a different amount than the posting's own —
+    // specifically, a proposal's top-up when the accepted bid exceeds what
+    // was funded at publish time. Still gated on being this posting's buyer
+    // above; this only changes how much of *their* money the wallet dialog
+    // asks for.
+    const override = request.nextUrl.searchParams.get('amountNIM')
+    const overrideNIM = override !== null ? Number(override) : null
+    const amountNIM =
+      overrideNIM !== null && Number.isFinite(overrideNIM) && overrideNIM > 0
+        ? overrideNIM
+        : Number(opportunity.amountNIM)
+
     return NextResponse.json({
       escrowAddress,
-      amountNIM: Number(opportunity.amountNIM),
+      amountNIM,
       // Luna is Nimiq's smallest unit; the wallet takes the value in luna.
-      amountLuna: Math.round(Number(opportunity.amountNIM) * 1e5),
+      amountLuna: Math.round(amountNIM * 1e5),
       network: process.env.NEXT_PUBLIC_NIMIQ_NETWORK ?? 'testnet',
     })
   } catch (error) {
