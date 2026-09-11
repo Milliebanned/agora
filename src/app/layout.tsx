@@ -16,7 +16,7 @@ const mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'NimTrust — P2P Trust & Escrow',
+  title: 'Agora: P2P Trust & Escrow',
   description: 'AI-powered trust layer for peer-to-peer commerce on Nimiq',
 }
 

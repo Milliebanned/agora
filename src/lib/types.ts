@@ -1,4 +1,4 @@
-// Shared TypeScript interfaces for NimTrust
+// Shared TypeScript interfaces for Agora
 
 // Which side of the marketplace a user is on. Chosen right after wallet
 // connect and stored on the profile; null means the choice is still pending.

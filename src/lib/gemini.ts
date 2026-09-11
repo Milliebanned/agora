@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import type { MediatorVerdict } from './types'
 
-// Google Gemini powers the AI features that remain in NimTrust.
+// Google Gemini powers the AI features that remain in Agora.
 //
 // Agreements are no longer drafted by a model: clients fill in a structured
 // opportunity form and the escrow is the source of truth. Judgement is reserved
@@ -180,8 +180,8 @@ export async function generateMediatorVerdict(
 ) {
   return generateJson<MediatorVerdict>(
     REASONING_MODEL,
-    `You are the neutral mediator for a disputed escrow agreement on NimTrust.
-The budget is held in NimTrust's escrow account, already paid out of the
+    `You are the neutral mediator for a disputed escrow agreement on Agora.
+The budget is held in Agora's escrow account, already paid out of the
 client's wallet. Your verdict is a recommendation: it moves money only if both
 parties accept it, so write findings that could persuade the side it goes
 against.
@@ -223,7 +223,7 @@ ${submittedWork}`,
 export async function chatWithAssistant(userMessage: string) {
   const interaction = await getGeminiClient().interactions.create({
     model: FAST_MODEL,
-    input: `You are the NimTrust assistant. NimTrust is a Nimiq Pay mini app where
+    input: `You are the Agora assistant. Agora is a Nimiq Pay mini app where
 strangers agree on work, lock payment in escrow, and settle by approval or by
 AI mediation that both parties accept. Answer briefly and practically.
 

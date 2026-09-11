@@ -1,4 +1,4 @@
-// Utility functions for NimTrust
+// Utility functions for Agora
 
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'

@@ -26,7 +26,7 @@ export default function GlobalError({
         }}
       >
         <div style={{ maxWidth: '32rem' }}>
-          <h1 style={{ fontSize: '15px', fontWeight: 500, margin: 0 }}>NimTrust failed to start</h1>
+          <h1 style={{ fontSize: '15px', fontWeight: 500, margin: 0 }}>Agora failed to start</h1>
           <p style={{ fontSize: '14px', lineHeight: 1.6, color: '#8b8d90' }}>
             The application could not load. Your deals and escrow are stored server-side and are
             unaffected.

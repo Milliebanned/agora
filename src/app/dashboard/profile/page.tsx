@@ -121,7 +121,7 @@ export default function ProfilePage() {
     <>
       <PageHeader
         title="Profile"
-        description="Your public identity and reputation on NimTrust."
+        description="Your public identity and reputation on Agora."
         action={
           !editing && (
             <Button variant="secondary" onClick={() => setEditing(true)}>
