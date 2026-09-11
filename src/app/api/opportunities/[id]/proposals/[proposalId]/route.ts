@@ -31,7 +31,7 @@ export async function PATCH(
     const user = await requireSession(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { action, currentBlock, serialized } = await request.json()
+    const { action, currentBlock, serialized, txHash: reportedHash } = await request.json()
 
     const proposal = await prisma.proposal.findUnique({
       where: { id: proposalId },
@@ -122,23 +122,53 @@ export async function PATCH(
       })
 
       if (!topupRow) {
-        if (!serialized) {
+        // The SDK types the wallet's response as "the serialized transaction",
+        // but some Nimiq Pay builds return only a hash instead (see the
+        // comment in sendBasicTransaction). Losing the payment because of that
+        // shape mismatch is exactly the failure this route exists to prevent,
+        // so every form the wallet might have sent is tried in turn, the same
+        // way `fund` already does.
+        let hash: string | null = null
+        let fromAddress: string | null = null
+
+        if (serialized) {
+          const check = await checkSignedPayment(serialized, {
+            escrowAddress,
+            expectedLuna: nimToSats(topupNeeded),
+          })
+          if (check.ok) {
+            hash = check.payment!.txHash
+            fromAddress = check.payment!.from
+          } else if (check.payment) {
+            // It decoded, and it is genuinely the wrong payment — wrong
+            // address, wrong payer, or too little. Refusing is right, and no
+            // money of this client's is at stake in this specific request.
+            return NextResponse.json(
+              { error: 'That top-up payment could not be verified', detail: check.reason },
+              { status: 400 },
+            )
+          } else if (/^[0-9a-f]{64}$/i.test(String(serialized).trim())) {
+            // Not decodable as a serialized transaction, but it reads as a
+            // transaction hash — some wallet builds return the hash where the
+            // SDK's types promise the serialized transaction. Take it at its
+            // word; the chain confirmation below is the real check on it.
+            hash = String(serialized).trim()
+          } else {
+            console.warn(
+              `[escrow] could not read the wallet's top-up transaction for deal ${id}: ${check.reason}`,
+            )
+          }
+        }
+        if (!hash && reportedHash) {
+          hash = reportedHash
+        }
+
+        if (!hash) {
           return NextResponse.json(
             {
               error: `This bid is ${topupNeeded.toFixed(2)} NIM above the funded budget. Fund the difference to accept it.`,
               topupNeeded,
             },
-            { status: 400 },
-          )
-        }
-
-        const check = await checkSignedPayment(serialized, {
-          escrowAddress,
-          expectedLuna: nimToSats(topupNeeded),
-        })
-        if (!check.ok) {
-          return NextResponse.json(
-            { error: 'That top-up payment could not be verified', detail: check.reason },
             { status: 400 },
           )
         }
@@ -158,8 +188,8 @@ export async function PATCH(
               agreementId: id,
               type: 'topup',
               status: 'pending',
-              txHash: check.payment!.txHash,
-              fromAddress: check.payment!.from,
+              txHash: hash,
+              fromAddress,
               amountNIM: topupNeeded,
             },
           })
