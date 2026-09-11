@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { recordEngagement } from '@/lib/reputation'
@@ -101,7 +102,7 @@ export async function PATCH(
     const excess = Math.max(0, funded - bid)
     const topupNeeded = Math.max(0, bid - funded)
 
-    let topupPayment: { txHash: string; fromAddress: string | null } | null = null
+    let topupRow: { id: string; txHash: string | null; status: string } | null = null
 
     if (topupNeeded > 0) {
       const escrowAddress = process.env.NIMIQ_ESCROW_ADDRESS
@@ -111,25 +112,70 @@ export async function PATCH(
           { status: 500 },
         )
       }
-      if (!serialized) {
-        return NextResponse.json(
-          {
-            error: `This bid is ${topupNeeded.toFixed(2)} NIM above the funded budget. Fund the difference to accept it.`,
-            topupNeeded,
-          },
-          { status: 400 },
-        )
+
+      // A pending or confirmed row from an earlier attempt wins over anything
+      // sent in this request. If the client already paid and it was recorded,
+      // this call resumes that payment; a freshly signed transaction must
+      // never become the reason for a second one to exist.
+      topupRow = await prisma.escrowTransaction.findFirst({
+        where: { agreementId: id, type: 'topup' },
+      })
+
+      if (!topupRow) {
+        if (!serialized) {
+          return NextResponse.json(
+            {
+              error: `This bid is ${topupNeeded.toFixed(2)} NIM above the funded budget. Fund the difference to accept it.`,
+              topupNeeded,
+            },
+            { status: 400 },
+          )
+        }
+
+        const check = await checkSignedPayment(serialized, {
+          escrowAddress,
+          expectedLuna: nimToSats(topupNeeded),
+        })
+        if (!check.ok) {
+          return NextResponse.json(
+            { error: 'That top-up payment could not be verified', detail: check.reason },
+            { status: 400 },
+          )
+        }
+
+        // ---- Record it before confirming it. ----
+        //
+        // This is the line that stops a client paying twice. From here on the
+        // payment exists in the database whatever the chain does next, and the
+        // unique constraint on (agreementId, type) means a concurrent second
+        // attempt finds this row instead of creating another. A failure in
+        // every step below — the chain unreachable, not yet confirmed, the
+        // deal no longer open — now has something to resume or refund from,
+        // instead of a real payment with no trace anywhere in the app.
+        try {
+          topupRow = await prisma.escrowTransaction.create({
+            data: {
+              agreementId: id,
+              type: 'topup',
+              status: 'pending',
+              txHash: check.payment!.txHash,
+              fromAddress: check.payment!.from,
+              amountNIM: topupNeeded,
+            },
+          })
+        } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            topupRow = await prisma.escrowTransaction.findFirst({
+              where: { agreementId: id, type: 'topup' },
+            })
+          } else {
+            throw err
+          }
+        }
       }
 
-      const expectedLuna = nimToSats(topupNeeded)
-      const check = await checkSignedPayment(serialized, { escrowAddress, expectedLuna })
-      if (!check.ok) {
-        return NextResponse.json(
-          { error: 'That top-up payment could not be verified', detail: check.reason },
-          { status: 400 },
-        )
-      }
-
+      // ---- Confirm against the chain. ----
+      //
       // Decoding a signed transaction proves it was signed correctly — it does
       // not prove it was ever broadcast. Only the chain's own copy is the last
       // word on whether the money actually moved, exactly as `fund` insists on
@@ -139,48 +185,55 @@ export async function PATCH(
         console.warn(
           'NIMIQ_SKIP_ESCROW_VERIFICATION=true — accepting a top-up without checking the chain. Never set this in production.',
         )
-      } else {
+      } else if (topupRow!.status !== 'confirmed') {
         let onChain
         try {
-          onChain = await waitForTransaction(check.payment!.txHash)
+          onChain = await waitForTransaction(topupRow!.txHash!)
         } catch (err) {
           return NextResponse.json(
             {
               error: 'Could not reach the Nimiq network to confirm your top-up payment',
               detail: err instanceof Error ? err.message : String(err),
+              paymentRecorded: true,
             },
             { status: 503 },
           )
         }
         if (!onChain) {
           // Broadcast but not yet in a block. Nothing failed — the client
-          // should not sign or pay again, just retry this same accept with
-          // the same signed transaction once it has landed.
+          // should not sign or pay again, just retry this same accept once it
+          // has landed; the row above is what makes that retry safe.
           return NextResponse.json(
             {
               message:
                 'Your top-up payment is broadcast and waiting to confirm on the network. Do not pay again — try accepting again in a moment.',
               pending: true,
+              paymentRecorded: true,
               topupNeeded,
             },
             { status: 202 },
           )
         }
-        if (!sameAddress(onChain.to, escrowAddress) || BigInt(Math.round(onChain.value)) < expectedLuna) {
+        if (
+          !sameAddress(onChain.to, escrowAddress) ||
+          BigInt(Math.round(onChain.value)) < nimToSats(topupNeeded)
+        ) {
           return NextResponse.json(
             { error: 'That top-up payment does not match what this proposal needs.' },
             { status: 400 },
           )
         }
+        await prisma.escrowTransaction.update({
+          where: { id: topupRow!.id },
+          data: { status: 'confirmed', confirmedAt: new Date() },
+        })
       }
 
-      topupPayment = { txHash: check.payment!.txHash, fromAddress: check.payment!.from }
-
-      // The wallet dialog and the signature took real time. Re-read fresh,
-      // immediately before locking, rather than trusting the state read at
-      // the top of the request — the realistic race here is someone else's
-      // proposal winning in that window, and by now the client has already
-      // paid the top-up into escrow.
+      // The wallet dialog, the signature and the chain confirmation all took
+      // real time. Re-read fresh, immediately before locking, rather than
+      // trusting the state read at the top of the request — the realistic
+      // race here is someone else's proposal winning in that window, and by
+      // now the client has already paid the top-up into escrow.
       const fresh = await prisma.agreement.findUnique({
         where: { id },
         select: { status: true },
@@ -195,6 +248,10 @@ export async function PATCH(
           await payFromEscrow({
             recipientAddress: opportunity.buyer.address,
             amountNIM: topupNeeded,
+          })
+          await prisma.escrowTransaction.update({
+            where: { id: topupRow!.id },
+            data: { status: 'refunded' },
           })
         } catch (err) {
           refunded = false
@@ -257,24 +314,6 @@ export async function PATCH(
     ])
 
     await recordEngagement([opportunity.buyerId, proposal.freelancerId])
-
-    // The top-up payment already landed in escrow before the transaction
-    // above; this just books it against the deal, the same way `fund` books
-    // the initial payment. No payout involved — money only moved once, into
-    // escrow, by the client's own signature.
-    if (topupNeeded > 0 && topupPayment) {
-      await prisma.escrowTransaction.create({
-        data: {
-          agreementId: id,
-          type: 'topup',
-          status: 'confirmed',
-          txHash: topupPayment.txHash,
-          fromAddress: topupPayment.fromAddress,
-          amountNIM: topupNeeded,
-          confirmedAt: new Date(),
-        },
-      })
-    }
 
     // A bid under budget refunds the difference automatically — no client
     // action needed. A failure here must not undo the acceptance above: the

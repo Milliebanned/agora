@@ -80,16 +80,35 @@ function ClientView({
     onError('')
     try {
       const bid = Number(proposal.bidNIM)
-      const topupNeeded = action === 'accept' ? Math.max(0, bid - funded) : 0
+      // The head of the chain comes from the device, because the timeout the
+      // HTLC will enforce is measured in blocks, not wall-clock time.
+      const currentBlock = action === 'accept' ? await getBlockNumber() : undefined
 
-      let serialized: string | undefined
-      let txHash: string | undefined
+      const attempt = async (serialized?: string, txHash?: string) => {
+        const res = await fetch(
+          `/api/opportunities/${opportunity.id}/proposals/${proposal.id}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action, currentBlock, serialized, txHash }),
+          },
+        )
+        return { res, body: await res.json().catch(() => null) }
+      }
 
-      // A bid above the funded budget: pay the gap into escrow first, as one
-      // continuous action with accepting — there is no separate "commit, then
-      // fund later" step, so the deal can never lock against money that isn't
-      // actually there.
-      if (topupNeeded > 0) {
+      // Always ask first, before touching the wallet. A bid within budget
+      // locks on this one call. A bid above it comes back naming exactly what
+      // is owed — or, if a top-up for this proposal is already on file from
+      // an earlier attempt, resumes confirming that instead. The wallet is
+      // only ever asked to sign after the server has just said, in this same
+      // round trip, that nothing has been paid yet — that ordering is what
+      // stops a failed request from turning into a second real payment.
+      let { res, body } = await attempt()
+
+      let topupPaidNow = false
+      if (res.status === 400 && typeof body?.topupNeeded === 'number') {
+        const topupNeeded = body.topupNeeded
         const destRes = await fetch(
           `/api/opportunities/${opportunity.id}/escrow?amountNIM=${topupNeeded}`,
           { credentials: 'include' },
@@ -107,28 +126,14 @@ function ClientView({
           onError(transfer.reason ?? 'The wallet did not send the top-up payment.')
           return
         }
-        serialized = transfer.serialized ?? undefined
-        txHash = transfer.txHash ?? undefined
+        topupPaidNow = true
+        ;({ res, body } = await attempt(transfer.serialized ?? undefined, transfer.txHash ?? undefined))
       }
-
-      // The head of the chain comes from the device, because the timeout the
-      // HTLC will enforce is measured in blocks, not wall-clock time.
-      const currentBlock = action === 'accept' ? await getBlockNumber() : undefined
-      const res = await fetch(
-        `/api/opportunities/${opportunity.id}/proposals/${proposal.id}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ action, currentBlock, serialized, txHash }),
-        },
-      )
-      const body = await res.json().catch(() => null)
 
       if (res.status === 202 && body?.pending) {
         // The top-up landed in the mempool but is not in a block yet. Nothing
         // failed and nothing should be paid again — just try the same accept
-        // once it has confirmed.
+        // once it has confirmed; the same ask-first call above resumes it.
         onNotice(body.message)
         return
       }
@@ -137,8 +142,8 @@ function ClientView({
       if (action === 'accept') {
         const name = proposal.freelancer.displayName ?? 'The freelancer'
         let message = `${name} is in. Create the HTLC to lock ${bid.toFixed(2)} NIM on-chain — the chat is open in the meantime.`
-        if (topupNeeded > 0) {
-          message += ` You funded the extra ${topupNeeded.toFixed(2)} NIM to make it happen.`
+        if (topupPaidNow) {
+          message += ` You funded the extra amount above budget to make it happen.`
         } else if (body?.refund?.ok) {
           message += ` ${Number(body.refund.amountNIM).toFixed(2)} NIM was refunded to you — the accepted bid came in under budget.`
         } else if (body?.refund && !body.refund.ok) {
