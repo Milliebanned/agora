@@ -15,6 +15,7 @@ import {
 import { Card } from '@/components/ui/card'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import { PageLoading } from '@/components/ui/page'
+import { useToast } from '@/components/ui/toast'
 import EscrowPanel from '@/components/opportunity/EscrowPanel'
 import ProposalPanel from '@/components/opportunity/ProposalPanel'
 import WorkPanel from '@/components/opportunity/WorkPanel'
@@ -32,20 +33,31 @@ export default function OpportunityDetailPage() {
   const params = useParams()
   const id = params.id as string
 
+  const toast = useToast()
   const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [notice, setNotice] = useState('')
+  // Guidance about the next step, which stays on screen beside the panel it
+  // refers to. Results of an action go to a toast instead.
+  const [hint, setHint] = useState('')
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/opportunities/${id}`, { credentials: 'include' })
     if (!res.ok) {
-      if (res.status === 401) router.push('/')
-      else setError((await res.json().catch(() => null))?.error ?? 'Could not load this opportunity')
+      if (res.status === 401) {
+        router.push('/')
+        return
+      }
+      const message =
+        (await res.json().catch(() => null))?.error ?? 'Could not load this opportunity'
+      // Held in state for the not-found screen, and surfaced as a toast for a
+      // refresh that fails while the page is already open.
+      setError(message)
+      toast.error(message)
       return
     }
     setOpportunity(await res.json())
-  }, [id, router])
+  }, [id, router, toast])
 
   useEffect(() => {
     load().finally(() => setLoading(false))
@@ -57,7 +69,7 @@ export default function OpportunityDetailPage() {
   useEffect(() => {
     if (!opportunity || opportunity.status !== 'draft' || !opportunity.viewer.isClient) return
     if (new URLSearchParams(window.location.search).get('fund') !== '1') return
-    setNotice(
+    setHint(
       'Saved as a draft. Commit the budget in the escrow panel to publish it — freelancers only see funded work.',
     )
   }, [opportunity])
@@ -145,16 +157,10 @@ export default function OpportunityDetailPage() {
         </div>
       </Card>
 
-      {notice && (
+      {hint && (
         <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-accent/25 bg-accent/[0.06] p-4">
           <CheckCircle2 className="mt-px h-4 w-4 shrink-0 text-accent" />
-          <p className="text-[13px] leading-relaxed text-secondary-foreground">{notice}</p>
-        </div>
-      )}
-      {error && (
-        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/[0.06] p-4">
-          <AlertTriangle className="mt-px h-4 w-4 shrink-0 text-destructive" />
-          <p className="text-[13px] leading-relaxed text-secondary-foreground">{error}</p>
+          <p className="text-[13px] leading-relaxed text-secondary-foreground">{hint}</p>
         </div>
       )}
 
@@ -236,15 +242,15 @@ export default function OpportunityDetailPage() {
             <WorkPanel
               opportunity={opportunity}
               onChanged={load}
-              onNotice={setNotice}
-              onError={setError}
+              onNotice={toast.success}
+              onError={toast.error}
             />
           ) : (
             <ProposalPanel
               opportunity={opportunity}
               onChanged={load}
-              onNotice={setNotice}
-              onError={setError}
+              onNotice={toast.success}
+              onError={toast.error}
             />
           )}
 
@@ -255,8 +261,8 @@ export default function OpportunityDetailPage() {
           <EscrowPanel
             opportunity={opportunity}
             onChanged={load}
-            onNotice={setNotice}
-            onError={setError}
+            onNotice={toast.success}
+            onError={toast.error}
           />
 
           {/* Once the work is under way the client still needs a way back to the
@@ -265,8 +271,8 @@ export default function OpportunityDetailPage() {
             <ProposalPanel
               opportunity={opportunity}
               onChanged={load}
-              onNotice={setNotice}
-              onError={setError}
+              onNotice={toast.success}
+              onError={toast.error}
             />
           )}
 

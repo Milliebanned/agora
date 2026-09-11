@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, X, Paperclip } from 'lucide-react'
@@ -43,6 +43,31 @@ export default function NewOpportunityPage() {
   const [attachments, setAttachments] = useState<{ label: string; url: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Arriving from "Hire" on a freelancer's advertisement. The advertised terms
+  // become the starting point for the posting, and stay fully editable — they
+  // are the freelancer's asking price, not an agreement yet. Nothing is
+  // committed until the client funds the escrow, exactly as with any posting.
+  const [hiring, setHiring] = useState<{ name: string } | null>(null)
+  useEffect(() => {
+    const from = new URLSearchParams(window.location.search).get('from')
+    if (!from) return
+    fetch(`/api/services/${from}`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((listing) => {
+        if (!listing) return
+        setTitle(listing.title)
+        setCategory(listing.category)
+        setServicePick(listing.serviceType ?? CATEGORIES[0].services[0])
+        setDescription(listing.description)
+        setBudget(String(Number(listing.priceNIM)))
+        setTimeline(String(listing.deliveryDays))
+        setHiring({
+          name: listing.provider?.displayName ?? 'this freelancer',
+        })
+      })
+      .catch(() => {})
+  }, [])
 
   const services = useMemo(
     () => CATEGORIES.find((c) => c.id === category)?.services ?? [],
@@ -106,6 +131,15 @@ export default function NewOpportunityPage() {
         title="Post an opportunity"
         description="Spell out the work. The clearer the brief, the better the proposals — and the more there is for the mediator to hold a freelancer to if it comes to that."
       />
+
+      {hiring && (
+        <div className="mb-6 rounded-lg border border-accent/25 bg-accent/[0.06] p-4">
+          <p className="text-[13px] leading-relaxed text-secondary-foreground">
+            Filled in from {hiring.name}&apos;s advertisement. Edit anything you like, then commit
+            the budget to escrow — they still have to accept before the work starts.
+          </p>
+        </div>
+      )}
 
       <Card>
         <form onSubmit={submit} className="space-y-6 p-6">

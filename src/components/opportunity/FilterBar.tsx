@@ -4,7 +4,13 @@ import { BUDGET_BANDS, CATEGORIES, SORTS, TIMELINE_BANDS } from '@/lib/opportuni
 import { Select } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
+// Which slice of the board to ask for. 'board' is the public funded list and
+// stays the default, so anything that does not set a scope behaves exactly as
+// it always has.
+export type BoardScope = 'board' | 'mine'
+
 export interface BoardFilters {
+  scope: BoardScope
   category: string
   budget: string
   timeline: string
@@ -12,6 +18,7 @@ export interface BoardFilters {
 }
 
 export const DEFAULT_FILTERS: BoardFilters = {
+  scope: 'board',
   category: 'all',
   budget: 'any',
   timeline: 'any',
@@ -20,6 +27,7 @@ export const DEFAULT_FILTERS: BoardFilters = {
 
 export function toQuery(filters: BoardFilters): string {
   const params = new URLSearchParams()
+  if (filters.scope !== 'board') params.set('scope', filters.scope)
   if (filters.category !== 'all') params.set('category', filters.category)
   if (filters.budget !== 'any') params.set('budget', filters.budget)
   if (filters.timeline !== 'any') params.set('timeline', filters.timeline)

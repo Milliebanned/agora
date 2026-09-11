@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/page'
 import { formatDate, parseJsonArray } from '@/lib/utils'
+import { MESSAGES } from '@/lib/messages'
 import type { OpportunityDetail } from './types'
 
 // Delivery and judgement in one place: the freelancer hands work in, the client
@@ -56,7 +57,7 @@ export default function WorkPanel({
         summary,
         attachments: links.filter((l) => l.url.trim()),
       })
-      onNotice('Work submitted. The client reviews it against the deliverables.')
+      onNotice(MESSAGES.workSubmitted)
       setResubmitting(false)
       setLinks([])
       await onChanged()
@@ -72,7 +73,7 @@ export default function WorkPanel({
     onError('')
     try {
       const result = await post(`/api/opportunities/${opportunity.id}/approve`, {})
-      onNotice(result.message ?? 'Approved.')
+      onNotice(result.message ?? MESSAGES.workApproved)
       await onChanged()
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Could not approve the work')
@@ -90,7 +91,7 @@ export default function WorkPanel({
     onError('')
     try {
       const dispute = await post('/api/disputes', { agreementId: opportunity.id, reason })
-      onNotice('Dispute opened. Run the mediator from the dispute page.')
+      onNotice(MESSAGES.disputeOpened)
       setShowDispute(false)
       window.location.href = `/dashboard/disputes/${dispute.id}`
     } catch (err) {

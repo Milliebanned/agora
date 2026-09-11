@@ -31,6 +31,38 @@ model User {
   receivedDisputes   Dispute[]        @relation("Respondent")
   reputationScores   ReputationScore?
   proposals          Proposal[]       @relation("Freelancer")
+  serviceListings    ServiceListing[] @relation("Provider")
+}
+
+// ServiceListing — a freelancer advertising what they do and what they charge
+// ("I will design your logo, 300 NIM, 5 days").
+//
+// This is advertising, not a contract: no escrow, no money, no obligations. A
+// client who wants one of these still hires through the normal funded
+// opportunity, so every NIM that moves still moves through an Agreement and its
+// HTLC. Keeping the two models apart is what stops an advertisement from ever
+// looking like committed budget.
+model ServiceListing {
+  id           String @id @default(cuid())
+  providerId   String
+  provider     User   @relation("Provider", fields: [providerId], references: [id])
+
+  title        String // "I will design your logo"
+  description  String
+  category     String
+  serviceType  String?
+  priceNIM     Decimal // what the freelancer charges, as advertised
+  deliveryDays Int
+
+  // published — visible on the client's Find workers board
+  // paused    — kept, but off the board
+  status String @default("published")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([providerId])
 }
 
 // Agreement — a marketplace opportunity across its whole life.

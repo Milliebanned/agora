@@ -9,6 +9,7 @@ import { Input, Textarea } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/page'
 import { formatDate, shortAddress, cn } from '@/lib/utils'
 import { getBlockNumber } from '@/lib/nimiq'
+import { MESSAGES } from '@/lib/messages'
 import type { OpportunityDetail, ProposalRow } from './types'
 
 // Two views of the same table. The client is choosing; the freelancer is
@@ -94,7 +95,7 @@ function ClientView({
       onNotice(
         action === 'accept'
           ? `${proposal.freelancer.displayName ?? 'The freelancer'} is in. Create the HTLC to lock ${Number(proposal.bidNIM).toFixed(2)} NIM on-chain — the chat is open in the meantime.`
-          : 'Proposal declined.',
+          : MESSAGES.proposalDeclined,
       )
       await onChanged()
     } catch (err) {
@@ -222,7 +223,7 @@ function FreelancerView({
       })
       const body = await res.json().catch(() => null)
       if (!res.ok) throw new Error(body?.error ?? `Could not send the proposal (${res.status})`)
-      onNotice(existing ? 'Proposal updated.' : 'Proposal sent. The client sees it on their board.')
+      onNotice(existing ? MESSAGES.applicationUpdated : MESSAGES.applicationSent)
       setEditing(false)
       await onChanged()
     } catch (err) {

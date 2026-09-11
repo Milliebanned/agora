@@ -2,20 +2,19 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Compass, FileText, Scale, User, LogOut, Plus } from 'lucide-react'
+import { LogOut } from 'lucide-react'
+import { useSession } from '@/components/SessionProvider'
+import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
-
-const NAV = [
-  { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/dashboard/opportunities', label: 'Opportunities', icon: Compass },
-  { href: '/dashboard/agreements', label: 'Deals', icon: FileText },
-  { href: '/dashboard/disputes', label: 'Disputes', icon: Scale },
-  { href: '/dashboard/profile', label: 'Profile', icon: User },
-]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { role } = useSession()
+
+  const nav = navForRole(role)
+  const primary = primaryActionForRole(role)
+  const PrimaryIcon = primary.icon
 
   const disconnect = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
@@ -30,15 +29,15 @@ export default function Sidebar() {
         <span className="text-[15px] font-medium tracking-body">Agora</span>
       </Link>
 
-      <Link href="/dashboard/opportunities/new" className="mb-4">
-        <span className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent text-[13px] font-medium text-accent-foreground transition hover:brightness-110">
-          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-          Post opportunity
+      <Link href={primary.href} className="mb-4">
+        <span className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-[#3bb143] text-[13px] font-medium text-white transition hover:brightness-110">
+          <PrimaryIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+          {primary.label}
         </span>
       </Link>
 
       <div className="space-y-0.5">
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const active =
             item.href === '/dashboard'
               ? pathname === '/dashboard'

@@ -9,7 +9,10 @@ import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader, StatTile, PageLoading } from '@/components/ui/page'
+import { useToast } from '@/components/ui/toast'
+import { useSession } from '@/components/SessionProvider'
 import { ROLE_LABELS, ROLE_TAGLINES, roleLabel } from '@/lib/roles'
+import { MESSAGES, FALLBACK_ERROR } from '@/lib/messages'
 import type { UserRole } from '@/lib/types'
 
 interface UserProfile {
@@ -38,6 +41,8 @@ function scoreTone(score: number) {
 export default function ProfilePage() {
   const [copied, setCopied] = useState(false)
   const router = useRouter()
+  const toast = useToast()
+  const { user, loading: sessionLoading, refresh } = useSession()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -47,15 +52,15 @@ export default function ProfilePage() {
   const [switchingRole, setSwitchingRole] = useState(false)
 
   useEffect(() => {
+    if (sessionLoading) return
+    if (!user) {
+      router.push('/')
+      return
+    }
+
     const load = async () => {
       try {
-        const sessionRes = await fetch('/api/auth/session', { credentials: 'include' })
-        if (!sessionRes.ok) {
-          router.push('/')
-          return
-        }
-        const session = await sessionRes.json()
-        const res = await fetch(`/api/users/${session.user.id}`, { credentials: 'include' })
+        const res = await fetch(`/api/users/${user.id}`, { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
         setProfile(data)
@@ -63,12 +68,13 @@ export default function ProfilePage() {
         setBio(data.bio || '')
       } catch (err) {
         console.error('Failed to load profile:', err)
+        toast.error('Could not load your profile. Refresh to try again.')
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [router])
+  }, [router, user, sessionLoading, toast])
 
   const handleSave = async () => {
     if (!profile) return
@@ -80,17 +86,25 @@ export default function ProfilePage() {
         body: JSON.stringify({ displayName, bio }),
         credentials: 'include',
       })
-      if (res.ok) {
-        setProfile({ ...profile, displayName, bio })
-        setEditing(false)
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => null))?.error
+        toast.error(detail ?? FALLBACK_ERROR)
+        return
       }
+      setProfile({ ...profile, displayName, bio })
+      setEditing(false)
+      toast.success(MESSAGES.profileSaved)
     } catch (err) {
       console.error('Failed to update profile:', err)
+      toast.error(FALLBACK_ERROR)
     } finally {
       setSaving(false)
     }
   }
 
+  // Switching sides re-skins the whole dashboard. The write lands first, then
+  // refresh() re-reads the session so the nav, the home screen and the board
+  // all follow from one source — the UI never shows a side the server refused.
   const switchRole = async (role: UserRole) => {
     if (!profile || profile.role === role) return
     setSwitchingRole(true)
@@ -101,9 +115,17 @@ export default function ProfilePage() {
         body: JSON.stringify({ role }),
         credentials: 'include',
       })
-      if (res.ok) setProfile({ ...profile, role })
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => null))?.error
+        toast.error(detail ?? 'Could not switch sides. Nothing was changed — try again.')
+        return
+      }
+      setProfile({ ...profile, role })
+      await refresh()
+      toast.success(MESSAGES.roleSwitched(ROLE_LABELS[role]))
     } catch (err) {
       console.error('Failed to switch role:', err)
+      toast.error('Could not switch sides. Nothing was changed — try again.')
     } finally {
       setSwitchingRole(false)
     }

@@ -2,22 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Compass, FileText, Scale, User, LogOut, Plus } from 'lucide-react'
+import { LogOut } from 'lucide-react'
+import { useSession } from '@/components/SessionProvider'
+import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
 // Agora runs inside the Nimiq Pay WebView, so the phone is the primary
 // target, not a fallback. The desktop sidebar is replaced here by a top bar
 // for identity and the primary action, and a thumb-reachable bottom tab bar.
-const TABS = [
-  { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/dashboard/opportunities', label: 'Browse', icon: Compass },
-  { href: '/dashboard/agreements', label: 'Deals', icon: FileText },
-  { href: '/dashboard/disputes', label: 'Disputes', icon: Scale },
-  { href: '/dashboard/profile', label: 'Profile', icon: User },
-]
 
 export function MobileTopBar() {
   const router = useRouter()
+  const { role } = useSession()
+
+  const primary = primaryActionForRole(role)
+  const PrimaryIcon = primary.icon
 
   const disconnect = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
@@ -33,10 +32,10 @@ export function MobileTopBar() {
       </Link>
 
       <div className="flex items-center gap-1">
-        <Link href="/dashboard/opportunities/new">
-          <span className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-[13px] font-medium text-accent-foreground">
-            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-            New
+        <Link href={primary.href}>
+          <span className="flex h-8 items-center gap-1.5 rounded-md bg-[#3bb143] px-3 text-[13px] font-medium text-white">
+            <PrimaryIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
+            {primary.shortLabel}
           </span>
         </Link>
         <button
@@ -53,26 +52,34 @@ export function MobileTopBar() {
 
 export function MobileTabBar() {
   const pathname = usePathname()
+  const { role } = useSession()
+
+  const tabs = navForRole(role)
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur-xl lg:hidden"
-      // Keeps the bar clear of the home indicator on notched phones.
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-background/95 backdrop-blur-xl lg:hidden"
+      style={{
+        // Tab count varies by role, so the track is set here rather than with a
+        // grid-cols-N class Tailwind would have to know about ahead of time.
+        gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
+        // Keeps the bar clear of the home indicator on notched phones.
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active =
           tab.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(tab.href)
         return (
           <Link key={tab.href} href={tab.href}>
             <span
               className={cn(
-                'flex h-14 flex-col items-center justify-center gap-1 transition-colors',
-                active ? 'text-accent' : 'text-muted-foreground',
+                'flex h-14 flex-col items-center justify-center gap-1 px-0.5 transition-colors',
+                active ? 'text-[#3bb143]' : 'text-muted-foreground',
               )}
             >
-              <tab.icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.4 : 2} />
-              <span className="text-[10px] leading-none">{tab.label}</span>
+              <tab.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={active ? 2.4 : 2} />
+              <span className="max-w-full truncate text-[10px] leading-none">{tab.label}</span>
             </span>
           </Link>
         )
