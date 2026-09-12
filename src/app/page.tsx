@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/page'
 import { useWalletLogin } from '@/hooks/useWalletLogin'
 import ThinkerScene from '@/components/decor/ThinkerScene'
+import PopularServices from '@/components/landing/PopularServices'
 
 const Globe = dynamic(() => import('@/components/globe/WireframeGlobe'), {
   ssr: false,
@@ -157,7 +158,7 @@ export default function Home() {
           </Badge>
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="relative z-10">
-              <h1 className="max-w-2xl text-[44px] font-bold uppercase leading-[1.05] tracking-tight sm:text-[64px]">
+              <h1 className="max-w-2xl text-[32px] font-bold uppercase leading-[1.06] tracking-tight sm:text-[46px]">
                 Trust between strangers
               </h1>
               <p className="mt-6 max-w-xl text-body-lg font-normal text-muted-foreground">
@@ -275,6 +276,29 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Popular services */}
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-content px-6 py-24">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-heading-sm font-medium tracking-heading">Popular services</h2>
+              <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-muted-foreground">
+                What people hire for most on Agora. Every one of them settles the same way, with the
+                budget in escrow before the work starts.
+              </p>
+            </div>
+            <a
+              href="#how"
+              className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              How settlement works →
+            </a>
+          </div>
+
+          <PopularServices signedIn={signedIn} onConnect={connectWallet} connecting={loading} />
         </div>
       </section>
 
