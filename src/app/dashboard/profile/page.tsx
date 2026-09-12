@@ -43,6 +43,10 @@ export default function ProfilePage() {
   const router = useRouter()
   const toast = useToast()
   const { user, loading: sessionLoading, refresh } = useSession()
+  const [ledger, setLedger] = useState<{
+    freelancer: { claimed: number; mediated: number; awaitingClaim: number }
+    client: { inEscrow: number; owedToFreelancers: number; paidOut: number; returned: number }
+  } | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -60,6 +64,10 @@ export default function ProfilePage() {
 
     const load = async () => {
       try {
+        fetch('/api/ledger', { credentials: 'include' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then(setLedger)
+          .catch(() => {})
         const res = await fetch(`/api/users/${user.id}`, { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
@@ -279,6 +287,67 @@ export default function ProfilePage() {
           </div>
         </div>
       </Card>
+
+      {ledger && (
+        <div className="mt-8">
+          <h2 className="mb-1 text-[15px] font-medium tracking-body">Money</h2>
+          <p className="mb-4 text-[13px] text-muted-foreground">
+            Counted from the payments themselves, not from how far along a deal is.
+          </p>
+
+          {(ledger.freelancer.claimed > 0 ||
+            ledger.freelancer.mediated > 0 ||
+            ledger.freelancer.awaitingClaim > 0) && (
+            <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <StatTile
+                label="Claimed"
+                value={ledger.freelancer.claimed.toFixed(2)}
+                hint="NIM you collected"
+              />
+              <StatTile
+                label="After mediation"
+                value={ledger.freelancer.mediated.toFixed(2)}
+                hint="NIM from settled disputes"
+              />
+              <StatTile
+                label="Waiting to claim"
+                value={ledger.freelancer.awaitingClaim.toFixed(2)}
+                hint="NIM approved, still in escrow"
+                accent={ledger.freelancer.awaitingClaim > 0}
+              />
+            </div>
+          )}
+
+          {(ledger.client.inEscrow > 0 ||
+            ledger.client.paidOut > 0 ||
+            ledger.client.returned > 0 ||
+            ledger.client.owedToFreelancers > 0) && (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatTile
+                label="In escrow"
+                value={ledger.client.inEscrow.toFixed(2)}
+                hint="NIM of yours being held"
+                accent={ledger.client.inEscrow > 0}
+              />
+              <StatTile
+                label="Awaiting collection"
+                value={ledger.client.owedToFreelancers.toFixed(2)}
+                hint="NIM approved, not yet claimed"
+              />
+              <StatTile
+                label="Paid to freelancers"
+                value={ledger.client.paidOut.toFixed(2)}
+                hint="NIM released for work done"
+              />
+              <StatTile
+                label="Returned to you"
+                value={ledger.client.returned.toFixed(2)}
+                hint="NIM from withdrawals and refunds"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-8">
         <h2 className="mb-4 text-[15px] font-medium tracking-body">Reputation</h2>
