@@ -50,6 +50,7 @@ export interface OpportunityDetail {
   deadline: string
   deliverables: string
   attachments: string
+  invitedSellerId?: string | null
   completionTerms: string
   refundTerms: string
   workSubmission: string | null

@@ -157,6 +157,8 @@ export default function OpportunityDetailPage() {
           <StatusBadge status={opportunity.status} tone={opportunity.status === 'open' ? 'accent' : undefined} />
           <Badge>{categoryLabel(opportunity.category)}</Badge>
           {opportunity.serviceType && <Badge>{opportunity.serviceType}</Badge>}
+          {/* Not on the board: this one was addressed to somebody. */}
+          {opportunity.invitedSellerId && <Badge tone="accent">Direct invitation</Badge>}
         </div>
         <h1 className="mt-3 text-heading-sm font-medium leading-tight tracking-heading">
           {opportunity.title}

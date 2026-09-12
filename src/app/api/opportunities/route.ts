@@ -40,6 +40,10 @@ export async function GET(request: NextRequest) {
     } else {
       where.status = 'open'
       where.publishedAt = { not: null }
+      // The public board is public work. A posting hired from somebody's
+      // advertisement was addressed to them, so it appears for that freelancer
+      // and for nobody else.
+      where.OR = [{ invitedSellerId: null }, { invitedSellerId: user.userId }]
     }
 
     if (isValidCategory(category)) where.category = category
@@ -123,6 +127,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: problems[0], problems }, { status: 400 })
     }
 
+    // Hiring from an advertisement addresses the posting to its author. The
+    // id is looked up rather than trusted: the body could name any listing, but
+    // only the listing's real provider can end up invited.
+    const listingId =
+      typeof body.sourceListingId === 'string' && body.sourceListingId.trim()
+        ? body.sourceListingId.trim().slice(0, 40)
+        : null
+    let sourceListingId: string | null = null
+    let invitedSellerId: string | null = null
+    if (listingId) {
+      const listing = await prisma.serviceListing.findUnique({
+        where: { id: listingId },
+        select: { id: true, providerId: true },
+      })
+      // Hiring yourself is not a deal, so that invitation is dropped and the
+      // posting behaves like any other.
+      if (listing && listing.providerId !== user.userId) {
+        sourceListingId = listing.id
+        invitedSellerId = listing.providerId
+      }
+    }
+
     const opportunity = await prisma.agreement.create({
       data: {
         title: title.slice(0, 140),
@@ -131,10 +157,10 @@ export async function POST(request: NextRequest) {
         serviceType: serviceType.slice(0, 80),
         timelineDays,
         // Which advertisement this was hired from, when it was one.
-        sourceListingId:
-          typeof body.sourceListingId === 'string' && body.sourceListingId.trim()
-            ? body.sourceListingId.trim().slice(0, 40)
-            : null,
+        sourceListingId,
+        // Read from the advertisement rather than the request, so a posting can
+        // only be addressed to the person who actually offered the service.
+        invitedSellerId,
         budgetNIM,
         // Escrow amount starts at the full budget and narrows to the accepted
         // bid, which can come in under it.

@@ -32,6 +32,7 @@ interface BoardRow {
   publishedAt: string | null
   buyerId: string
   buyer?: { id: string; displayName: string | null }
+  invitedSellerId?: string | null
   _count?: { proposals: number }
 }
 
@@ -201,6 +202,8 @@ export default function OpportunitiesPage() {
                             status={row.status}
                             tone={row.status === 'open' ? 'accent' : undefined}
                           />
+                        ) : row.invitedSellerId ? (
+                          <Badge tone="accent">Sent to you</Badge>
                         ) : (
                           <Badge tone="accent">
                             <Lock className="h-3 w-3" />

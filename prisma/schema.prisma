@@ -93,6 +93,10 @@ model Agreement {
   // advertisement, so an ad can say how many deals came out of it and refuse
   // to be deleted while one of them is still running.
   sourceListingId String?
+  // Who this posting was sent to. A job hired from an advertisement is
+  // addressed to that freelancer and nobody else: it never reaches the public
+  // board, and only they can propose on it.
+  invitedSellerId String?
 
   budgetNIM    Decimal? // budget as posted; amountNIM narrows to the accepted bid
   attachments  String   @default("[]") @db.Text // JSON array of { label, url }
@@ -142,6 +146,7 @@ model Agreement {
   @@index([status, publishedAt])
   @@index([buyerId])
   @@index([sellerId])
+  @@index([invitedSellerId])
 }
 
 // Proposal — a freelancer's pitch for an open opportunity.
