@@ -41,7 +41,13 @@ export default function FreelancerHome({
 }) {
   const [pendingApplications, setPendingApplications] = useState<number | null>(null)
   const [board, setBoard] = useState<BoardRow[]>([])
-  const [ledger, setLedger] = useState<{ claimed: number; mediated: number; awaitingClaim: number } | null>(null)
+  const [ledger, setLedger] = useState<{
+    claimed: number
+    mediated: number
+    awaitingClaim: number
+    paidDeals: number
+    awaitingClaimDealIds: string[]
+  } | null>(null)
 
   useEffect(() => {
     fetch('/api/opportunities?scope=applied', { credentials: 'include' })
@@ -68,8 +74,12 @@ export default function FreelancerHome({
   // to their client side and shows up under Deals, not here.
   const mine = deals.filter((d) => d.sellerId === meId)
   const active = mine.filter((d) => d.status === 'locked' || d.status === 'submitted')
-  const claimable = mine.filter((d) => d.status === 'completed')
-  const readyToClaim = claimable.reduce((sum, d) => sum + Number(d.amountNIM), 0)
+  // A deal's status does not change when the escrow is claimed — approving and
+  // collecting are different events and only one of them is a payment. Asking
+  // the ledger which deals are still unpaid is the only way to stop telling
+  // somebody to claim money they already have.
+  const claimable = ledger ? mine.filter((d) => ledger.awaitingClaimDealIds.includes(d.id)) : []
+  const readyToClaim = ledger?.awaitingClaim ?? 0
   // Collected, not merely approved. A completed deal whose escrow is still
   // unclaimed is money waiting, not money earned, and the tile below says so
   // separately.
@@ -97,12 +107,31 @@ export default function FreelancerHome({
         />
         <StatTile
           label="Ready to claim"
-          value={(ledger?.awaitingClaim ?? readyToClaim).toFixed(2)}
+          value={readyToClaim.toFixed(2)}
           hint="NIM approved, not yet collected"
-          accent={(ledger?.awaitingClaim ?? readyToClaim) > 0}
+          accent={readyToClaim > 0}
         />
         <StatTile label="Trust score" value={`${Math.round(trustScore)}`} hint="out of 100" />
       </div>
+
+      {/* What the work actually paid. Separate from the row above because
+          everything there is a count of things in flight, and this is money
+          already in the wallet. */}
+      {ledger && (earned > 0 || readyToClaim > 0) && (
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <StatTile
+            label="Earned"
+            value={earned.toFixed(2)}
+            hint={`NIM collected across ${ledger.paidDeals} deal${ledger.paidDeals === 1 ? '' : 's'}`}
+            accent={earned > 0}
+          />
+          <StatTile
+            label="After mediation"
+            value={ledger.mediated.toFixed(2)}
+            hint="NIM of that from settled disputes"
+          />
+        </div>
+      )}
 
       {claimable.length > 0 && (
         <Link href={`/dashboard/opportunities/${claimable[0].id}`}>
