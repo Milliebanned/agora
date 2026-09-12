@@ -38,7 +38,7 @@ export async function GET(
           select: {
             id: true,
             address: true,
-            displayName: true,
+            displayName: true,            avatarUpdatedAt: true,
             bio: true,
             reputationScores: { select: { trustScore: true, completedAgreements: true } },
           },
@@ -131,7 +131,7 @@ export async function POST(
         status: 'pending',
       },
       include: {
-        freelancer: { select: { id: true, address: true, displayName: true } },
+        freelancer: { select: { id: true, address: true, displayName: true, avatarUpdatedAt: true } },
       },
     })
 

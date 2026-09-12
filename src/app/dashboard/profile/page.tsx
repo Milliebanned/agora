@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { PageHeader, StatTile, PageLoading } from '@/components/ui/page'
 import { useToast } from '@/components/ui/toast'
 import { useSession } from '@/components/SessionProvider'
+import Avatar from '@/components/ui/avatar'
+import AvatarUpload from '@/components/AvatarUpload'
 import { ROLE_LABELS, ROLE_TAGLINES, roleLabel } from '@/lib/roles'
 import { MESSAGES, FALLBACK_ERROR } from '@/lib/messages'
 import type { UserRole } from '@/lib/types'
@@ -21,6 +23,7 @@ interface UserProfile {
   displayName: string
   bio?: string
   role?: UserRole | null
+  avatarUpdatedAt?: string | null
   createdAt: string
   reputation: {
     trustScore: number
@@ -164,9 +167,7 @@ export default function ProfilePage() {
       <Card>
         <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-elevate-strong text-[18px] font-medium">
-              {profile.displayName.charAt(0).toUpperCase()}
-            </div>
+            <Avatar person={profile} size={56} />
             <div>
               <div className="flex items-center gap-2.5">
                 <h2 className="text-[20px] font-medium tracking-heading">{profile.displayName}</h2>
@@ -215,7 +216,25 @@ export default function ProfilePage() {
 
       {editing && (
         <Card className="mt-3">
-          <div className="space-y-4 p-6">
+          <div className="space-y-5 p-6">
+            {/* The picture saves on its own, the moment it is picked, rather
+                than waiting on the Save button below. There is nothing to
+                validate about it and nothing else on the form it depends on,
+                and seeing it land is the confirmation. */}
+            <div>
+              <p className="mb-2.5 text-[13px] font-medium text-secondary-foreground">
+                Profile picture
+              </p>
+              <AvatarUpload
+                person={profile}
+                onChange={(avatarUpdatedAt) => {
+                  setProfile({ ...profile, avatarUpdatedAt })
+                  // The sidebar reads the session, not this page.
+                  refresh()
+                }}
+              />
+            </div>
+
             <div>
               <label className="text-[13px] font-medium text-secondary-foreground">
                 Display name

@@ -7,6 +7,7 @@ import { useSession } from '@/components/SessionProvider'
 import NotificationBell from '@/components/NotificationBell'
 import ThemeToggle from '@/components/ThemeToggle'
 import UnreadDot from '@/components/ui/unread-dot'
+import Avatar from '@/components/ui/avatar'
 import { navForRole, primaryActionForRole, roleLabel } from '@/lib/roles'
 import { cn, shortAddress } from '@/lib/utils'
 
@@ -29,7 +30,6 @@ export default function Sidebar() {
   }
 
   const name = user?.displayName?.trim() || (user ? shortAddress(user.address) : '')
-  const initial = (user?.displayName?.trim() || 'A').charAt(0).toUpperCase()
 
   return (
     <nav className="sticky top-0 hidden h-screen w-[232px] shrink-0 flex-col border-r border-border bg-card px-3 py-4 lg:flex">
@@ -53,9 +53,7 @@ export default function Sidebar() {
           href="/dashboard/profile"
           className="mb-4 flex items-center gap-2.5 rounded-lg bg-surface px-2.5 py-2.5 transition-colors hover:bg-elevate"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-[13px] font-medium text-accent-foreground">
-            {initial}
-          </span>
+          <Avatar person={user} size={32} />
           <span className="min-w-0">
             <span className="block truncate text-[13px] font-medium text-foreground">{name}</span>
             <span className="block text-[11.5px] text-subtle-foreground">{roleLabel(role)}</span>

@@ -4,6 +4,9 @@ export interface Party {
   id: string
   address: string
   displayName: string | null
+  /** Null when they have no profile picture, which is what draws initials
+   *  instead. Also the cache key on the picture's URL. */
+  avatarUpdatedAt?: string | null
 }
 
 export interface ProposalRow {

@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
         content: content.trim().substring(0, 1000), // Max 1000 chars
       },
       include: {
-        sender: { select: { displayName: true } },
+        sender: { select: { displayName: true, avatarUpdatedAt: true } },
       },
     })
 

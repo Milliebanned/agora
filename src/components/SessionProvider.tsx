@@ -9,6 +9,9 @@ export interface SessionUser {
   address: string
   displayName?: string | null
   role?: UserRole | null
+  /** Null when they have not uploaded a picture, which is what the initials
+   *  fallback keys off. Doubles as the cache key on the picture's URL. */
+  avatarUpdatedAt?: string | null
   isPlatformMediator?: boolean
 }
 

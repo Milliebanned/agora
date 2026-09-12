@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
 import { PageHeader, EmptyState, PageLoading } from '@/components/ui/page'
+import Avatar from '@/components/ui/avatar'
 import { useSession } from '@/components/SessionProvider'
 import { CATEGORIES, categoryLabel } from '@/lib/opportunities'
 import { shortAddress, cn } from '@/lib/utils'
@@ -23,6 +24,7 @@ interface Listing {
     id: string
     address: string
     displayName: string | null
+    avatarUpdatedAt: string | null
     bio: string | null
     reputationScores: { trustScore: number; completedAgreements: number } | null
   }
@@ -138,9 +140,7 @@ export default function WorkersPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-subtle-foreground">
                         <span className="flex items-center gap-1.5 text-secondary-foreground">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-elevate-strong text-[10px]">
-                            {name.charAt(0).toUpperCase()}
-                          </span>
+                          <Avatar person={listing.provider} size={20} />
                           {name}
                         </span>
                         {rep && (

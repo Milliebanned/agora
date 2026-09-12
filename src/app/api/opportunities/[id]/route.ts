@@ -38,8 +38,8 @@ export async function GET(
     const opportunity = await prisma.agreement.findUnique({
       where: { id },
       include: {
-        buyer: { select: { id: true, address: true, displayName: true } },
-        seller: { select: { id: true, address: true, displayName: true } },
+        buyer: { select: { id: true, address: true, displayName: true, avatarUpdatedAt: true } },
+        seller: { select: { id: true, address: true, displayName: true, avatarUpdatedAt: true } },
         escrowTransactions: { orderBy: { createdAt: 'desc' } },
         disputes: {
           select: { id: true, status: true, createdAt: true, humanRequestedAt: true },
@@ -50,7 +50,7 @@ export async function GET(
               select: {
                 id: true,
                 address: true,
-                displayName: true,
+                displayName: true,                avatarUpdatedAt: true,
                 reputationScores: { select: { trustScore: true, completedAgreements: true } },
               },
             },
@@ -58,7 +58,7 @@ export async function GET(
           orderBy: { createdAt: 'desc' },
         },
         messages: {
-          include: { sender: { select: { id: true, displayName: true } } },
+          include: { sender: { select: { id: true, displayName: true, avatarUpdatedAt: true } } },
           orderBy: { createdAt: 'asc' },
           take: 200,
         },

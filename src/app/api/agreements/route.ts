@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
         ...(status && { status: status as any }),
       },
       include: {
-        buyer: { select: { id: true, address: true, displayName: true } },
-        seller: { select: { id: true, address: true, displayName: true } },
+        buyer: { select: { id: true, address: true, displayName: true, avatarUpdatedAt: true } },
+        seller: { select: { id: true, address: true, displayName: true, avatarUpdatedAt: true } },
       },
       orderBy: { createdAt: 'desc' },
     })

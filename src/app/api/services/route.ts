@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             address: true,
-            displayName: true,
+            displayName: true,            avatarUpdatedAt: true,
             bio: true,
             // Shown next to the price: what someone charges means little
             // without what they have delivered before.

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/page'
+import Avatar from '@/components/ui/avatar'
 import { formatDate, cn } from '@/lib/utils'
 import type { MessageRow, OpportunityDetail } from './types'
 
@@ -20,6 +21,12 @@ export default function ChatPanel({ opportunity }: { opportunity: OpportunityDet
   const endRef = useRef<HTMLDivElement>(null)
 
   const engaged = Boolean(opportunity.sellerId)
+
+  // The other person in this thread, whichever side the reader is on. A
+  // mediator reading as a third party is on neither side, so they see the
+  // client, who posted the work.
+  const counterparty =
+    opportunity.viewer.id === opportunity.buyer.id ? opportunity.seller : opportunity.buyer
 
   // Polling rather than a socket: the WebView suspends aggressively when the
   // phone locks, and a refetch on resume is more reliable than a reconnect.
@@ -108,12 +115,21 @@ export default function ChatPanel({ opportunity }: { opportunity: OpportunityDet
               <div
                 key={msg.id}
                 className={cn(
-                  'max-w-[85%] rounded-lg px-3.5 py-2.5',
-                  msg.senderId === opportunity.viewer.id
-                    ? 'ml-auto bg-accent/10'
-                    : 'bg-elevate',
+                  'flex max-w-[85%] gap-2.5',
+                  msg.senderId === opportunity.viewer.id ? 'ml-auto flex-row-reverse' : '',
                 )}
               >
+                {/* Only the other side gets a picture. Yours is on every
+                    message you send and says nothing you do not know. */}
+                {msg.senderId !== opportunity.viewer.id && counterparty && (
+                  <Avatar person={counterparty} size={28} className="mt-0.5" />
+                )}
+                <div
+                  className={cn(
+                    'min-w-0 rounded-lg px-3.5 py-2.5',
+                    msg.senderId === opportunity.viewer.id ? 'bg-accent/10' : 'bg-elevate',
+                  )}
+                >
                 <div className="flex items-baseline gap-2">
                   <span className="text-[12px] font-medium text-secondary-foreground">
                     {msg.senderId === opportunity.viewer.id
@@ -127,6 +143,7 @@ export default function ChatPanel({ opportunity }: { opportunity: OpportunityDet
                 <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed text-foreground">
                   {msg.content}
                 </p>
+                </div>
               </div>
             ),
           )

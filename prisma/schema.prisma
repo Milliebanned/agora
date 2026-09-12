@@ -19,6 +19,11 @@ model User {
   // "provider" = offers services, "client" = requires services.
   // Null until the user picks one on /onboarding.
   role        String?
+  // When the profile picture last changed, or null if there is none. Kept on
+  // the user rather than only on the image so that anything already reading a
+  // user knows whether to draw a picture or initials, and has a value to hang
+  // a cache-busting query on, without a second query for a row it may not need.
+  avatarUpdatedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -33,6 +38,28 @@ model User {
   proposals          Proposal[]       @relation("Freelancer")
   serviceListings    ServiceListing[] @relation("Provider")
   notifications      Notification[]
+  avatar             Avatar?
+}
+
+// A profile picture.
+//
+// Deliberately its own table. A user row is read on nearly every request in
+// the app, often several at a time for a list of proposals or freelancers, and
+// an image sitting on it would be dragged through all of them. Here it is only
+// read by the one route that serves it.
+//
+// Stored as base64 rather than in object storage because the client has
+// already cropped it square and scaled it down to a few tens of kilobytes
+// before it ever arrives, and a bucket would be one more thing to configure,
+// secure and keep in step with the database.
+model Avatar {
+  userId    String   @id
+  mimeType  String
+  data      String
+  bytes     Int
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ServiceListing — a freelancer advertising what they do and what they charge

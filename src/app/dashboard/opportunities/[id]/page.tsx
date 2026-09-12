@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import Avatar from '@/components/ui/avatar'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import { PageLoading, Spinner } from '@/components/ui/page'
 import { useToast } from '@/components/ui/toast'
@@ -164,8 +165,10 @@ export default function OpportunityDetailPage() {
           {opportunity.title}
         </h1>
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-subtle-foreground">
-          <span className="flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5" />
+          {/* Who posted this, as a face rather than an icon standing in for
+              one. It is the first thing a freelancer weighs. */}
+          <span className="flex items-center gap-1.5 text-secondary-foreground">
+            <Avatar person={opportunity.buyer} size={20} />
             {opportunity.buyer.displayName ?? shortAddress(opportunity.buyer.address)}
           </span>
           <span>·</span>
