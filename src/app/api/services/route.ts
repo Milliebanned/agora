@@ -55,6 +55,29 @@ export async function GET(request: NextRequest) {
       take: 100,
     })
 
+    // Only on your own list: how much work each advertisement actually
+    // produced, and whether any of it is still running (which is what stops a
+    // deletion). A browsing client has no business seeing either.
+    if (scope === 'mine' && listings.length > 0) {
+      const deals = await prisma.agreement.groupBy({
+        by: ['sourceListingId', 'status'],
+        where: { sourceListingId: { in: listings.map((l) => l.id) } },
+        _count: { _all: true },
+      })
+      const LIVE = new Set(['locked', 'submitted', 'completed', 'disputed'])
+      const stats = new Map<string, { deals: number; liveDeals: number }>()
+      for (const row of deals) {
+        const key = row.sourceListingId as string
+        const at = stats.get(key) ?? { deals: 0, liveDeals: 0 }
+        at.deals += row._count._all
+        if (LIVE.has(row.status)) at.liveDeals += row._count._all
+        stats.set(key, at)
+      }
+      return NextResponse.json(
+        listings.map((l) => ({ ...l, ...(stats.get(l.id) ?? { deals: 0, liveDeals: 0 }) })),
+      )
+    }
+
     return NextResponse.json(listings)
   } catch (error) {
     console.error('List service listings error:', error)

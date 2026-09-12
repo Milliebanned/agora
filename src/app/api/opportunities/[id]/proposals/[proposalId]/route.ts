@@ -7,6 +7,7 @@ import { payFromEscrow, EscrowConfigError } from '@/lib/escrow-wallet'
 import { checkSignedPayment } from '@/lib/escrow-verify'
 import { sameAddress, waitForTransaction } from '@/lib/nimiq-rpc'
 import { nimToSats } from '@/lib/utils'
+import { notify, TABS } from '@/lib/notifications'
 
 // @nimiq/core is WebAssembly and, for an over-budget accept, signs a real
 // payout — Node runtime, not edge.
@@ -69,9 +70,19 @@ export async function PATCH(
     }
 
     if (action === 'reject') {
-      return NextResponse.json(
-        await prisma.proposal.update({ where: { id: proposalId }, data: { status: 'rejected' } }),
-      )
+      const rejected = await prisma.proposal.update({
+        where: { id: proposalId },
+        data: { status: 'rejected' },
+      })
+      await notify({
+        userId: proposal.freelancerId,
+        tab: TABS.applications,
+        type: 'proposal_rejected',
+        body: `Your proposal on "${opportunity.title}" was declined.`,
+        href: `/dashboard/applications`,
+        agreementId: id,
+      })
+      return NextResponse.json(rejected)
     }
 
     if (action !== 'accept') {
@@ -344,6 +355,15 @@ export async function PATCH(
     ])
 
     await recordEngagement([opportunity.buyerId, proposal.freelancerId])
+
+    await notify({
+      userId: proposal.freelancerId,
+      tab: TABS.deals,
+      type: 'proposal_accepted',
+      body: `You were hired for "${opportunity.title}" at ${bid} NIM. The chat is open.`,
+      href: `/dashboard/opportunities/${id}`,
+      agreementId: id,
+    })
 
     // A bid under budget refunds the difference automatically — no client
     // action needed. A failure here must not undo the acceptance above: the

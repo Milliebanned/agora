@@ -32,6 +32,7 @@ model User {
   reputationScores   ReputationScore?
   proposals          Proposal[]       @relation("Freelancer")
   serviceListings    ServiceListing[] @relation("Provider")
+  notifications      Notification[]
 }
 
 // ServiceListing — a freelancer advertising what they do and what they charge
@@ -88,6 +89,11 @@ model Agreement {
   category     String? // see CATEGORIES in src/lib/opportunities.ts
   serviceType  String? // the specific service within the category
   timelineDays Int? // working days the client is asking for
+  // Set when this posting was created by hiring from a freelancer's
+  // advertisement, so an ad can say how many deals came out of it and refuse
+  // to be deleted while one of them is still running.
+  sourceListingId String?
+
   budgetNIM    Decimal? // budget as posted; amountNIM narrows to the accepted bid
   attachments  String   @default("[]") @db.Text // JSON array of { label, url }
 
@@ -290,4 +296,30 @@ model ReputationScore {
   trustScore Int @default(0) // 0-100
 
   updatedAt DateTime @updatedAt
+}
+
+// Notification — something happened that one specific person should see.
+//
+// Stored per recipient rather than derived per request, because "has this
+// person seen it yet" is the whole point and nothing else in the schema
+// records it. `tab` holds the nav href the badge belongs on, so the counter
+// and the navigation agree by construction instead of by a mapping table that
+// can drift.
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tab  String // e.g. "/dashboard/agreements"
+  type String // proposal_received, proposal_accepted, message, dispute_opened, ...
+  body String // one sentence, already written for the reader
+  href String? // where clicking it should land
+
+  agreementId String?
+
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  @@index([userId, readAt])
+  @@index([userId, tab, readAt])
 }

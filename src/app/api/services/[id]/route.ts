@@ -124,6 +124,26 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'This is not your advertisement' }, { status: 403 })
     }
 
+    // An advertisement can be pulled down at any time — unless work is
+    // actually running because of it. A live deal keeps its own record of what
+    // was agreed, but the ad is the only description of what was offered, and
+    // deleting it mid-job removes the one thing either party could point at.
+    const live = await prisma.agreement.count({
+      where: {
+        sourceListingId: id,
+        status: { in: ['locked', 'submitted', 'completed', 'disputed'] },
+      },
+    })
+    if (live > 0) {
+      return NextResponse.json(
+        {
+          error: `${live} deal${live > 1 ? 's' : ''} from this advertisement ${live > 1 ? 'are' : 'is'} still running. Take it off the board instead — it stops new clients finding it without touching work already under way.`,
+          liveDeals: live,
+        },
+        { status: 409 },
+      )
+    }
+
     await prisma.serviceListing.delete({ where: { id } })
     return NextResponse.json({ ok: true })
   } catch (error) {

@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 
 interface Listing {
   id: string
+  deals?: number
+  liveDeals?: number
   title: string
   description: string
   category: string
@@ -153,6 +155,8 @@ export default function AdvertisementsPage() {
         credentials: 'include',
       })
       if (!res.ok) {
+        // A refusal here is the guard doing its job (work is still running
+        // from this ad), so it explains itself rather than reading as a fault.
         toast.error((await res.json().catch(() => null))?.error ?? FALLBACK_ERROR)
         return
       }
@@ -352,6 +356,14 @@ export default function AdvertisementsPage() {
                       <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">
                         {listing.description}
                       </p>
+                      {(listing.deals ?? 0) > 0 && (
+                        <p className="mt-2 text-[12px] text-subtle-foreground">
+                          {listing.deals} deal{listing.deals === 1 ? '' : 's'} came from this
+                          {(listing.liveDeals ?? 0) > 0
+                            ? ` · ${listing.liveDeals} still running`
+                            : ''}
+                        </p>
+                      )}
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-mono text-[15px] tabular-nums text-foreground">
@@ -376,7 +388,12 @@ export default function AdvertisementsPage() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      disabled={busy === listing.id}
+                      disabled={busy === listing.id || (listing.liveDeals ?? 0) > 0}
+                      title={
+                        (listing.liveDeals ?? 0) > 0
+                          ? 'Work from this advertisement is still running. Take it off the board instead.'
+                          : undefined
+                      }
                       onClick={() => remove(listing)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />

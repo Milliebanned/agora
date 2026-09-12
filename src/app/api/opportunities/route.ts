@@ -130,6 +130,11 @@ export async function POST(request: NextRequest) {
         category,
         serviceType: serviceType.slice(0, 80),
         timelineDays,
+        // Which advertisement this was hired from, when it was one.
+        sourceListingId:
+          typeof body.sourceListingId === 'string' && body.sourceListingId.trim()
+            ? body.sourceListingId.trim().slice(0, 40)
+            : null,
         budgetNIM,
         // Escrow amount starts at the full budget and narrows to the accepted
         // bid, which can come in under it.

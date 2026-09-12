@@ -12,9 +12,10 @@ import {
   Wallet,
   User,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge, StatusBadge } from '@/components/ui/badge'
-import { PageLoading } from '@/components/ui/page'
+import { PageLoading, Spinner } from '@/components/ui/page'
 import { useToast } from '@/components/ui/toast'
 import EscrowPanel from '@/components/opportunity/EscrowPanel'
 import ProposalPanel from '@/components/opportunity/ProposalPanel'
@@ -23,6 +24,7 @@ import ChatPanel from '@/components/opportunity/ChatPanel'
 import type { OpportunityDetail } from '@/components/opportunity/types'
 import { categoryLabel, isEngaged, parseAttachments } from '@/lib/opportunities'
 import { formatDate, parseJsonArray, shortAddress } from '@/lib/utils'
+import { FALLBACK_ERROR } from '@/lib/messages'
 
 // One page for the whole life of an opportunity. What it shows is decided by
 // who is reading and how far along the deal is: a stranger sees the brief and a
@@ -34,6 +36,8 @@ export default function OpportunityDetailPage() {
   const id = params.id as string
 
   const toast = useToast()
+  const [confirmingWithdraw, setConfirmingWithdraw] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
   const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null)
   const [loading, setLoading] = useState(true)
   // Guidance about the next step, which stays on screen beside the panel it
@@ -90,8 +94,41 @@ export default function OpportunityDetailPage() {
   const deliverables = parseJsonArray(opportunity.deliverables)
   const attachments = parseAttachments(opportunity.attachments)
   const budget = Number(opportunity.budgetNIM ?? opportunity.amountNIM)
+  const withdraw = async () => {
+    setWithdrawing(true)
+    try {
+      const res = await fetch(`/api/opportunities/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'cancelled' }),
+      })
+      const body = await res.json().catch(() => null)
+      if (!res.ok) {
+        toast.error(body?.detail ? `${body.error} — ${body.detail}` : body?.error ?? FALLBACK_ERROR)
+        return
+      }
+      toast.success(
+        body?.refund
+          ? `Posting withdrawn. ${Number(body.refund.amountNIM).toFixed(2)} NIM is on its way back to your wallet.`
+          : 'Posting withdrawn.',
+      )
+      router.push('/dashboard/agreements')
+    } catch {
+      toast.error(FALLBACK_ERROR)
+    } finally {
+      setWithdrawing(false)
+    }
+  }
+
   const { isParty, isClient, isMediator } = opportunity.viewer
   const engaged = isEngaged(opportunity.status) || opportunity.status === 'completed'
+  // Withdrawable right up until somebody is hired. After that the freelancer
+  // has started work against it and it is no longer the client's alone to take
+  // back — that is what a dispute is for.
+  const withdrawable =
+    isClient && (opportunity.status === 'draft' || opportunity.status === 'open')
+  const committed = Number(opportunity.amountNIM)
 
   return (
     <>
@@ -131,6 +168,46 @@ export default function OpportunityDetailPage() {
           <span>·</span>
           <span>Posted {formatDate(opportunity.publishedAt ?? opportunity.createdAt)}</span>
         </p>
+
+        {withdrawable && (
+          <div className="mt-4">
+            {confirmingWithdraw ? (
+              <div className="rounded-lg border border-destructive/25 bg-destructive/[0.05] p-4">
+                <p className="text-[13px] font-medium text-secondary-foreground">
+                  Withdraw this posting?
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  {opportunity.status === 'open'
+                    ? `It comes off the board, any proposals on it are declined, and the ${committed.toFixed(2)} NIM in escrow is sent back to your wallet.`
+                    : 'It is a draft, so nothing was ever committed and nothing is returned.'}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={withdrawing}
+                    onClick={withdraw}
+                  >
+                    {withdrawing ? <Spinner className="h-3.5 w-3.5" /> : null}
+                    {withdrawing ? 'Withdrawing' : 'Yes, withdraw it'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={withdrawing}
+                    onClick={() => setConfirmingWithdraw(false)}
+                  >
+                    Keep it up
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => setConfirmingWithdraw(true)}>
+                Withdraw posting
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <Card>

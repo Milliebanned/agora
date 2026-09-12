@@ -49,6 +49,7 @@ export default function NewOpportunityPage() {
   // are the freelancer's asking price, not an agreement yet. Nothing is
   // committed until the client funds the escrow, exactly as with any posting.
   const [hiring, setHiring] = useState<{ name: string } | null>(null)
+  const [sourceListingId, setSourceListingId] = useState<string | null>(null)
   useEffect(() => {
     const from = new URLSearchParams(window.location.search).get('from')
     if (!from) return
@@ -62,6 +63,7 @@ export default function NewOpportunityPage() {
         setDescription(listing.description)
         setBudget(String(Number(listing.priceNIM)))
         setTimeline(String(listing.deliveryDays))
+        setSourceListingId(from)
         setHiring({
           name: listing.provider?.displayName ?? 'this freelancer',
         })
@@ -104,6 +106,7 @@ export default function NewOpportunityPage() {
           budgetNIM: Number(budget),
           timelineDays: Number(timeline),
           attachments: attachments.filter((a) => a.url.trim()),
+          sourceListingId,
         }),
       })
       const body = await res.json().catch(() => null)

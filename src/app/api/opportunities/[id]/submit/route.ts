@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { notify, TABS } from '@/lib/notifications'
 import { parseAttachments, sanitizeAttachments } from '@/lib/opportunities'
 
 // Marks an attachment as part of the delivery rather than part of the brief.
@@ -65,6 +66,15 @@ export async function POST(
         status: 'submitted',
         attachments: JSON.stringify(merged.slice(0, 12)),
       },
+    })
+
+    await notify({
+      userId: opportunity.buyerId,
+      tab: TABS.deals,
+      type: 'work_submitted',
+      body: `Work was submitted on "${opportunity.title}" and is waiting for your review.`,
+      href: `/dashboard/opportunities/${id}`,
+      agreementId: id,
     })
 
     await prisma.message.create({

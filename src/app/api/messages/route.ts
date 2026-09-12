@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { notify, TABS } from '@/lib/notifications'
 import { isPlatformAdmin } from '@/lib/admin'
 
 // Chat is private and it opens late: only the client and the freelancer they
@@ -51,6 +52,17 @@ export async function POST(request: NextRequest) {
       include: {
         sender: { select: { displayName: true } },
       },
+    })
+
+    const recipientId =
+      agreement.buyerId === user.userId ? agreement.sellerId : agreement.buyerId
+    await notify({
+      userId: recipientId,
+      tab: TABS.deals,
+      type: 'message',
+      body: `${message.sender.displayName ?? 'The other party'} sent a message on "${agreement.title}".`,
+      href: `/dashboard/opportunities/${agreementId}`,
+      agreementId,
     })
 
     return NextResponse.json(message, { status: 201 })
