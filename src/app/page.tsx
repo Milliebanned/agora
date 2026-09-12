@@ -158,8 +158,8 @@ export default function Home() {
           </Badge>
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="relative z-10">
-              <h1 className="max-w-2xl text-[32px] font-bold uppercase leading-[1.06] tracking-tight sm:text-[46px]">
-                Trust between strangers
+              <h1 className="max-w-2xl font-display text-[36px] font-light leading-[1.02] tracking-[-0.02em] sm:text-[54px]">
+                Trust between <em className="text-[#98fb98]">strangers</em>
               </h1>
               <p className="mt-6 max-w-xl text-body-lg font-normal text-muted-foreground">
                 Hire, collaborate, and get paid with confidence.
