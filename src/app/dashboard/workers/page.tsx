@@ -43,6 +43,11 @@ export default function WorkersPage() {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('all')
+  // Arriving from a service card on the landing page, which names one.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('category')
+    if (wanted && CATEGORIES.some((c) => c.id === wanted)) setCategory(wanted)
+  }, [])
   const [sort, setSort] = useState('newest')
 
   const load = useCallback(async () => {
