@@ -20,11 +20,11 @@ const OPTIONS: {
     role: 'provider',
     icon: Briefcase,
     title: 'I offer a service',
-    tagline: 'Designer, developer, writer, translator — anyone selling work.',
+    tagline: 'Designer, developer, writer, translator: anyone selling work.',
     bullets: [
-      'See the payment locked in escrow before you start',
-      'Submit milestones and claim funds on approval',
-      'Build a portable trust score with every delivery',
+      'Every job on the board has its budget in escrow before you write a word',
+      'Advertise what you do and what you charge, and get hired straight from it',
+      'Claim the escrow yourself once your work is approved',
     ],
   },
   {
@@ -33,9 +33,9 @@ const OPTIONS: {
     title: 'I need a service',
     tagline: 'You have work that needs doing and a budget to back it.',
     bullets: [
-      'Describe the job — AI drafts the agreement for you',
-      'Fund a Nimiq HTLC that only releases on your approval',
-      'Open a dispute for AI mediation if the work falls short',
+      'Post a job, or hire a freelancer straight from their advertisement',
+      'Your budget sits in escrow and is returned if you withdraw',
+      'Nothing is paid out until you approve the work',
     ],
   },
 ]
@@ -64,7 +64,7 @@ export default function OnboardingPage() {
           return
         }
         const { user } = await res.json()
-        // Already picked a side — nothing to do here.
+        // Already picked a side, so nothing to do here.
         if (user.role) {
           router.replace('/dashboard')
           return
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
           Which side are you on?
         </h1>
         <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-          Agora has two kinds of people. Pick the one that fits — it shapes your dashboard and
+          Agora has two kinds of people. Pick the one that fits: it shapes your dashboard and
           which side of the escrow you sit on. You can switch later from your profile.
         </p>
 
