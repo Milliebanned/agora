@@ -76,7 +76,11 @@ export default function AdvertisementsPage() {
   }, [])
 
   useEffect(() => {
-    if (sessionLoading || role !== 'provider') return
+    if (sessionLoading) return
+    // A client is redirected above. Anyone else with no side picked, a platform
+    // mediator for instance, still gets their own list rather than a spinner
+    // that never resolves.
+    if (role === 'client') return
     load()
   }, [load, role, sessionLoading])
 
@@ -169,7 +173,7 @@ export default function AdvertisementsPage() {
     }
   }
 
-  if (sessionLoading || (loading && role === 'provider')) {
+  if (sessionLoading || (loading && role !== 'client')) {
     return <PageLoading label="Loading your advertisements" />
   }
 
