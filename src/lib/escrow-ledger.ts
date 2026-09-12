@@ -29,6 +29,12 @@ export interface FreelancerLedger {
   mediated: number
   /** Approved, and still sitting in escrow waiting for them to claim it. */
   awaitingClaim: number
+  /** How many deals they have actually been paid on. */
+  paidDeals: number
+  /** Which deals are still waiting to be claimed. Approving does not change a
+   *  deal's status and neither does claiming it, so status alone cannot tell
+   *  these apart — only the presence of a payment can. */
+  awaitingClaimDealIds: string[]
 }
 
 export interface ClientLedger {
@@ -57,6 +63,7 @@ export async function ledgerFor(userId: string): Promise<{
   const deals = await prisma.agreement.findMany({
     where: { OR: [{ buyerId: userId }, { sellerId: userId }] },
     select: {
+      id: true,
       buyerId: true,
       sellerId: true,
       status: true,
@@ -69,7 +76,13 @@ export async function ledgerFor(userId: string): Promise<{
     },
   })
 
-  const freelancer: FreelancerLedger = { claimed: 0, mediated: 0, awaitingClaim: 0 }
+  const freelancer: FreelancerLedger = {
+    claimed: 0,
+    mediated: 0,
+    awaitingClaim: 0,
+    paidDeals: 0,
+    awaitingClaimDealIds: [],
+  }
   const client: ClientLedger = { inEscrow: 0, owedToFreelancers: 0, paidOut: 0, returned: 0 }
 
   for (const deal of deals) {
@@ -82,11 +95,13 @@ export async function ledgerFor(userId: string): Promise<{
       const mediated = deal.status === 'settled' || deal.disputes.some((d) => d.status === 'resolved')
       if (mediated) freelancer.mediated += toFreelancer
       else freelancer.claimed += toFreelancer
+      if (toFreelancer > 0) freelancer.paidDeals += 1
 
       // Approved but not yet collected. Counted from the deal rather than from
       // a payment, because the whole point is that no payment exists yet.
       if (deal.status === 'completed' && toFreelancer === 0) {
         freelancer.awaitingClaim += Number(deal.amountNIM)
+        freelancer.awaitingClaimDealIds.push(deal.id)
       }
     }
 
