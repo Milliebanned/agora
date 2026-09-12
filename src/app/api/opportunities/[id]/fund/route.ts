@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { notify, TABS } from '@/lib/notifications'
 import { randomHex, sha256, nimToSats } from '@/lib/utils'
 import { getTransactionsByAddress, sameAddress, waitForTransaction } from '@/lib/nimiq-rpc'
 import { checkSignedPayment } from '@/lib/escrow-verify'
@@ -336,6 +337,18 @@ export async function POST(
         },
       }),
     ])
+
+    // A directed posting has an audience of one, and no board to be found on.
+    if (published.invitedSellerId) {
+      await notify({
+        userId: published.invitedSellerId,
+        tab: TABS.deals,
+        type: 'invited_job',
+        body: `${published.buyer?.displayName ?? 'A client'} sent you a job from your advertisement: "${published.title}".`,
+        href: `/dashboard/opportunities/${id}`,
+        agreementId: id,
+      })
+    }
 
     return NextResponse.json({
       message: skipVerification

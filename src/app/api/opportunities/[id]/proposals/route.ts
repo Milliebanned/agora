@@ -79,6 +79,13 @@ export async function POST(
         { status: 400 },
       )
     }
+    // A job hired from an advertisement belongs to the freelancer who wrote it.
+    if (opportunity.invitedSellerId && opportunity.invitedSellerId !== user.userId) {
+      return NextResponse.json(
+        { error: 'This job was sent to a specific freelancer' },
+        { status: 403 },
+      )
+    }
 
     const body = await request.json()
     const coverLetter = String(body.coverLetter ?? '').trim()

@@ -71,6 +71,7 @@ export async function GET(
 
     const isClient = opportunity.buyerId === user.userId
     const isFreelancer = opportunity.sellerId === user.userId
+    const isInvited = opportunity.invitedSellerId === user.userId
     const isParty = isClient || isFreelancer
 
     // A platform mediator can read a deal they have been asked to rule on, and
@@ -93,6 +94,12 @@ export async function GET(
     if (!isParty && !isMediator && opportunity.status !== 'open') {
       return NextResponse.json({ error: 'Not visible' }, { status: 403 })
     }
+    // An open posting is readable by anyone who could pitch for it. A posting
+    // hired from an advertisement could only ever be pitched by the person it
+    // was sent to, so it is readable by them and the client alone.
+    if (!isParty && !isMediator && opportunity.invitedSellerId && !isInvited) {
+      return NextResponse.json({ error: 'Not visible' }, { status: 403 })
+    }
 
     // The pre-image is the spending key to the HTLC. It leaves the server for
     // exactly one reader — the freelancer, after approval — and does so through
@@ -106,6 +113,7 @@ export async function GET(
         id: user.userId,
         isClient,
         isFreelancer,
+        isInvited,
         isParty,
         // Read-only. A mediator is deliberately not a party: they can see
         // everything the case turns on and act on none of it, because
