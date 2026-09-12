@@ -117,7 +117,7 @@ export default function WorkersPage() {
           description="Freelancers post what they offer here. You can always describe the work yourself and let proposals come to you instead."
           action={
             <Link href="/dashboard/opportunities/new">
-              <Button>Post an opportunity</Button>
+              <Button>Post a job</Button>
             </Link>
           }
         />

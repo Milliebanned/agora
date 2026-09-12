@@ -131,7 +131,7 @@ export default function NewOpportunityPage() {
       </Link>
 
       <PageHeader
-        title="Post an opportunity"
+        title="Post a job"
         description="Spell out the work. The clearer the brief, the better the proposals — and the more there is for the mediator to hold a freelancer to if it comes to that."
       />
 

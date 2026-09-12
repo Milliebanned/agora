@@ -142,7 +142,7 @@ export default function ClientHome({
               <Link href="/dashboard/opportunities/new">
                 <Button>
                   <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  Post your first opportunity
+                  Post your first job
                 </Button>
               </Link>
             }

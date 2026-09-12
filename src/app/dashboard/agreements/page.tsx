@@ -88,7 +88,7 @@ export default function DealsPage() {
             <Link href="/dashboard/opportunities/new">
               <Button>
                 <Plus className="h-4 w-4" strokeWidth={2.5} />
-                Post opportunity
+                Post job
               </Button>
             </Link>
           )
@@ -131,7 +131,7 @@ export default function DealsPage() {
                 <Link href="/dashboard/opportunities/new">
                   <Button>
                     <Plus className="h-4 w-4" strokeWidth={2.5} />
-                    Post opportunity
+                    Post job
                   </Button>
                 </Link>
                 <Link href="/dashboard/opportunities">
