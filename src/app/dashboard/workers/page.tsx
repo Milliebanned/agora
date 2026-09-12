@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select } from '@/components/ui/input'
 import { PageHeader, EmptyState, PageLoading } from '@/components/ui/page'
-import Avatar from '@/components/ui/avatar'
+import WorkerCard from '@/components/dashboard/WorkerCard'
 import { useSession } from '@/components/SessionProvider'
 import { CATEGORIES, categoryLabel } from '@/lib/opportunities'
 import { shortAddress, cn } from '@/lib/utils'
@@ -81,13 +81,15 @@ export default function WorkersPage() {
       />
 
       <div className="mb-5 space-y-3">
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0">
+        {/* Wraps rather than scrolling sideways: a filter somebody has to
+            swipe to find is a filter they do not know is there. */}
+        <div className="flex flex-wrap gap-1.5">
           {[{ id: 'all', label: 'All work' }, ...CATEGORIES].map((c) => (
             <button
               key={c.id}
               onClick={() => setCategory(c.id)}
               className={cn(
-                'h-7 shrink-0 rounded-full px-3 text-[13px] transition-colors',
+                'h-7 rounded-full px-3 text-[13px] transition-colors',
                 category === c.id
                   ? 'bg-elevate-strong text-foreground'
                   : 'bg-elevate text-muted-foreground hover:bg-elevate-strong hover:text-secondary-foreground',
@@ -129,63 +131,10 @@ export default function WorkersPage() {
           }
         />
       ) : (
-        <div className="space-y-3">
-          {listings.map((listing) => {
-            const rep = listing.provider.reputationScores
-            const name = listing.provider.displayName ?? shortAddress(listing.provider.address)
-            return (
-              <Card key={listing.id}>
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-subtle-foreground">
-                        <span className="flex items-center gap-1.5 text-secondary-foreground">
-                          <Avatar person={listing.provider} size={20} />
-                          {name}
-                        </span>
-                        {rep && (
-                          <span className="flex items-center gap-1">
-                            <Star className="h-3 w-3" />
-                            {Math.round(rep.trustScore)} trust · {rep.completedAgreements} done
-                          </span>
-                        )}
-                        <span>
-                          {categoryLabel(listing.category)}
-                          {listing.serviceType ? ` · ${listing.serviceType}` : ''}
-                        </span>
-                      </div>
-
-                      <p className="mt-2.5 text-[15px] font-medium tracking-body">{listing.title}</p>
-                      <p className="mt-1 line-clamp-3 text-[13px] leading-relaxed text-muted-foreground">
-                        {listing.description}
-                      </p>
-                      <p className="mt-2 flex items-center gap-1 text-[12px] text-subtle-foreground">
-                        <Clock className="h-3 w-3" />
-                        Delivers in {listing.deliveryDays} day
-                        {listing.deliveryDays === 1 ? '' : 's'}
-                      </p>
-                    </div>
-
-                    <div className="shrink-0 text-right">
-                      <p className="font-mono text-[16px] tabular-nums text-foreground">
-                        {Number(listing.priceNIM).toFixed(0)}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-subtle-foreground">NIM</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 border-t border-border pt-4">
-                    <Link href={`/dashboard/opportunities/new?from=${listing.id}`}>
-                      <Button size="sm">
-                        <Users className="h-3.5 w-3.5" />
-                        Hire {name}
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </Card>
-            )
-          })}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {listings.map((listing) => (
+            <WorkerCard key={listing.id} listing={listing} />
+          ))}
         </div>
       )}
     </>

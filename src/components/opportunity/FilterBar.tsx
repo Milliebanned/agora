@@ -49,13 +49,13 @@ export default function FilterBar({
     <div className="mb-5 space-y-3">
       {/* Category is the filter people reach for first, so it stays one tap
           away rather than behind a dropdown. */}
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0">
+      <div className="flex flex-wrap gap-1.5">
         {[{ id: 'all', label: 'All work' }, ...CATEGORIES].map((c) => (
           <button
             key={c.id}
             onClick={() => set({ category: c.id })}
             className={cn(
-              'h-7 shrink-0 rounded-full px-3 text-[13px] transition-colors',
+              'h-7 rounded-full px-3 text-[13px] transition-colors',
               filters.category === c.id
                 ? 'bg-elevate-strong text-foreground'
                 : 'bg-elevate text-muted-foreground hover:bg-elevate-strong hover:text-secondary-foreground',

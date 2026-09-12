@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/input'
@@ -148,6 +147,18 @@ export default function ProfilePage() {
   const { reputation: rep } = profile
   const completionRate =
     rep.totalAgreements > 0 ? Math.round((rep.completedAgreements / rep.totalAgreements) * 100) : 0
+  // Anything at all moved, on either side of the market.
+  const hasMoney = Boolean(
+    ledger &&
+      (ledger.freelancer.claimed > 0 ||
+        ledger.freelancer.mediated > 0 ||
+        ledger.freelancer.awaitingClaim > 0 ||
+        ledger.client.inEscrow > 0 ||
+        ledger.client.paidOut > 0 ||
+        ledger.client.returned > 0 ||
+        ledger.client.owedToFreelancers > 0),
+  )
+
   const score = Math.round(rep.trustScore)
 
   return (
@@ -164,52 +175,79 @@ export default function ProfilePage() {
         }
       />
 
+      {/* The same arrangement a freelancer card uses on the directory: the
+          picture first and largest, the name under it, and the standing that
+          was earned under that. This is the page people are told their profile
+          looks like, so it should look like the thing other people see. */}
       <Card>
-        <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar person={profile} size={56} />
+        <div className="flex flex-col items-center px-6 py-8 text-center">
+          <Avatar person={profile} size={96} className="ring-4 ring-accent/15" />
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+            <h2 className="text-[22px] font-medium tracking-heading">{profile.displayName}</h2>
+            <Badge tone={profile.role ? 'accent' : 'neutral'}>{roleLabel(profile.role)}</Badge>
+          </div>
+
+          {/* Shown in full, not shortened. This is the address that identifies
+              you to the platform, and a truncated one cannot be copied into
+              anything that needs it. */}
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard?.writeText(profile.address)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1800)
+            }}
+            title="Copy your wallet address"
+            className="group mt-1.5 flex max-w-full items-center justify-center gap-1.5 font-mono text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span className="break-all">{profile.address}</span>
+            {copied ? (
+              <Check className="h-3 w-3 shrink-0 text-success" />
+            ) : (
+              <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+            )}
+          </button>
+
+          {profile.bio && !editing && (
+            <p className="mt-3 max-w-md text-[14px] leading-relaxed text-muted-foreground">
+              {profile.bio}
+            </p>
+          )}
+
+          <div className="mt-5 flex w-full max-w-sm items-center justify-center gap-6">
             <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-[20px] font-medium tracking-heading">{profile.displayName}</h2>
-                <Badge tone={profile.role ? 'accent' : 'neutral'}>{roleLabel(profile.role)}</Badge>
-              </div>
-              {/* Shown in full, not shortened. This is the address that
-                  identifies you to the platform, and a truncated one cannot be
-                  copied into anything that needs it. */}
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard?.writeText(profile.address)
-                  setCopied(true)
-                  setTimeout(() => setCopied(false), 1800)
-                }}
-                title="Copy your wallet address"
-                className="group mt-0.5 flex items-center gap-1.5 text-left font-mono text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+              <p className="text-[12px] text-muted-foreground">Trust score</p>
+              <p
+                className={`mt-0.5 text-[28px] font-medium leading-none tabular-nums ${scoreTone(score)}`}
               >
-                <span className="break-all">{profile.address}</span>
-                {copied ? (
-                  <Check className="h-3 w-3 shrink-0 text-success" />
-                ) : (
-                  <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-                )}
-              </button>
-              <p className="mt-0.5 text-[12px] text-subtle-foreground">
-                Joined {formatDate(profile.createdAt)}
+                {score}
+              </p>
+            </div>
+            <span className="h-9 w-px bg-border" aria-hidden="true" />
+            <div>
+              <p className="text-[12px] text-muted-foreground">Completed</p>
+              <p className="mt-0.5 text-[28px] font-medium leading-none tabular-nums text-foreground">
+                {profile.reputation.completedAgreements}
+              </p>
+            </div>
+            <span className="h-9 w-px bg-border" aria-hidden="true" />
+            <div>
+              <p className="text-[12px] text-muted-foreground">Joined</p>
+              <p className="mt-1 text-[13px] leading-none text-secondary-foreground">
+                {new Date(profile.createdAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  year: 'numeric',
+                })}
               </p>
             </div>
           </div>
 
-          <div className="text-left sm:text-right">
-            <p className="text-[13px] text-muted-foreground">Trust score</p>
-            <p className={`text-[40px] font-medium leading-none tabular-nums ${scoreTone(score)}`}>
-              {score}
-            </p>
-            <div className="mt-2 h-1 w-full min-w-[140px] overflow-hidden rounded-full bg-elevate-strong">
-              <div
-                className={`h-full rounded-full ${score >= 75 ? 'bg-success' : score >= 45 ? 'bg-accent' : 'bg-destructive'}`}
-                style={{ width: `${score}%` }}
-              />
-            </div>
+          <div className="mt-4 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-elevate-strong">
+            <div
+              className={`h-full rounded-full ${score >= 75 ? 'bg-success' : score >= 45 ? 'bg-accent' : 'bg-destructive'}`}
+              style={{ width: `${score}%` }}
+            />
           </div>
         </div>
       </Card>
@@ -274,15 +312,6 @@ export default function ProfilePage() {
         </Card>
       )}
 
-      {profile.bio && !editing && (
-        <Card className="mt-3">
-          <div className="p-6">
-            <p className="mb-2 text-[13px] font-medium text-secondary-foreground">About</p>
-            <p className="text-[14px] leading-relaxed text-muted-foreground">{profile.bio}</p>
-          </div>
-        </Card>
-      )}
-
       <Card className="mt-3">
         <div className="p-6">
           <p className="text-[13px] font-medium text-secondary-foreground">Marketplace side</p>
@@ -307,7 +336,10 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      {ledger && (
+      {/* Both halves of this are conditional on there being something to say,
+          so the heading has to be too. A brand new account was getting a
+          "Money" heading with an empty space under it. */}
+      {ledger && hasMoney && (
         <div className="mt-8">
           <h2 className="mb-1 text-[15px] font-medium tracking-body">Money</h2>
           <p className="mb-4 text-[13px] text-muted-foreground">
