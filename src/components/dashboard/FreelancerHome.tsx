@@ -41,6 +41,7 @@ export default function FreelancerHome({
 }) {
   const [pendingApplications, setPendingApplications] = useState<number | null>(null)
   const [board, setBoard] = useState<BoardRow[]>([])
+  const [ledger, setLedger] = useState<{ claimed: number; mediated: number; awaitingClaim: number } | null>(null)
 
   useEffect(() => {
     fetch('/api/opportunities?scope=applied', { credentials: 'include' })
@@ -56,6 +57,11 @@ export default function FreelancerHome({
       .then((res) => (res.ok ? res.json() : []))
       .then(setBoard)
       .catch(() => {})
+
+    fetch('/api/ledger', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setLedger(data?.freelancer ?? null))
+      .catch(() => {})
   }, [])
 
   // Only work this user is delivering. Anything they posted themselves belongs
@@ -64,9 +70,10 @@ export default function FreelancerHome({
   const active = mine.filter((d) => d.status === 'locked' || d.status === 'submitted')
   const claimable = mine.filter((d) => d.status === 'completed')
   const readyToClaim = claimable.reduce((sum, d) => sum + Number(d.amountNIM), 0)
-  const earned = mine
-    .filter((d) => d.status === 'completed' || d.status === 'settled')
-    .reduce((sum, d) => sum + Number(d.amountNIM), 0)
+  // Collected, not merely approved. A completed deal whose escrow is still
+  // unclaimed is money waiting, not money earned, and the tile below says so
+  // separately.
+  const earned = ledger ? ledger.claimed + ledger.mediated : 0
 
   const activeRows: DealRow[] = active.map((d) => ({
     id: d.id,
@@ -90,9 +97,9 @@ export default function FreelancerHome({
         />
         <StatTile
           label="Ready to claim"
-          value={readyToClaim.toFixed(2)}
-          hint="NIM approved for you"
-          accent={readyToClaim > 0}
+          value={(ledger?.awaitingClaim ?? readyToClaim).toFixed(2)}
+          hint="NIM approved, not yet collected"
+          accent={(ledger?.awaitingClaim ?? readyToClaim) > 0}
         />
         <StatTile label="Trust score" value={`${Math.round(trustScore)}`} hint="out of 100" />
       </div>

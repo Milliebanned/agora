@@ -30,7 +30,19 @@ export default function ClientHome({
 }) {
   const [postings, setPostings] = useState<PostingRow[]>([])
 
+  const [ledger, setLedger] = useState<{
+    inEscrow: number
+    owedToFreelancers: number
+    paidOut: number
+    returned: number
+  } | null>(null)
+
   useEffect(() => {
+    fetch('/api/ledger', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setLedger(data?.client ?? null))
+      .catch(() => {})
+
     fetch('/api/opportunities?scope=mine', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : []))
       .then(setPostings)
@@ -86,12 +98,37 @@ export default function ClientHome({
         <StatTile label="In progress" value={active.length} hint="freelancer engaged" />
         <StatTile
           label="In escrow"
-          value={escrowBalance.toFixed(2)}
-          hint="NIM committed"
-          accent={escrowBalance > 0}
+          value={(ledger?.inEscrow ?? escrowBalance).toFixed(2)}
+          hint="NIM being held for you"
+          accent={(ledger?.inEscrow ?? escrowBalance) > 0}
         />
         <StatTile label="Trust score" value={`${Math.round(trustScore)}`} hint="out of 100" />
       </div>
+
+      {/* Money that has already left escrow, split by where it went. Paid and
+          returned are both "no longer held" and mean opposite things, so they
+          are never added together. */}
+      {ledger && (ledger.paidOut > 0 || ledger.returned > 0 || ledger.owedToFreelancers > 0) && (
+        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
+          {ledger.owedToFreelancers > 0 && (
+            <StatTile
+              label="Awaiting collection"
+              value={ledger.owedToFreelancers.toFixed(2)}
+              hint="NIM approved, freelancer has not claimed"
+            />
+          )}
+          <StatTile
+            label="Paid to freelancers"
+            value={ledger.paidOut.toFixed(2)}
+            hint="NIM released for work done"
+          />
+          <StatTile
+            label="Returned to you"
+            value={ledger.returned.toFixed(2)}
+            hint="NIM from withdrawals, refunds and mediation"
+          />
+        </div>
+      )}
 
       {awaitingReview.length > 0 && (
         <Link href={`/dashboard/opportunities/${awaitingReview[0].id}`}>
