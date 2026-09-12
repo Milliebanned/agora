@@ -52,6 +52,10 @@ const FEATURES = [
   },
 ]
 
+// Outlined by default, and the outline only takes the brand colour on hover.
+const NAV_LINK =
+  'group flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-2.5 py-1.5 font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground disabled:opacity-50'
+
 const STEPS = [
   ['Connect', 'Sign in with your Nimiq Pay wallet. No password, no signup form.'],
   ['Post', 'Fill in the brief and commit the budget. Only funded work reaches the board.'],
@@ -85,15 +89,12 @@ export default function Home() {
         {label}
       </>
     )
-    const className =
-      'group flex shrink-0 items-center gap-1.5 whitespace-nowrap font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50'
-
     return signedIn ? (
-      <Link href={href} className={className}>
+      <Link href={href} className={NAV_LINK}>
         {inner}
       </Link>
     ) : (
-      <button type="button" onClick={connectWallet} disabled={loading} className={className}>
+      <button type="button" onClick={connectWallet} disabled={loading} className={NAV_LINK}>
         {inner}
       </button>
     )
@@ -106,14 +107,14 @@ export default function Home() {
           {/* Both boards are behind the wallet, so on a signed-out visit these
               ask for the wallet rather than leading somewhere that would just
               bounce them back. */}
-          <nav className="order-3 -mx-6 flex w-full items-center gap-5 overflow-x-auto px-6 md:order-1 md:mx-0 md:w-auto md:flex-1 md:overflow-visible md:px-0">
+          <nav className="order-3 -mx-6 flex w-full items-center gap-2 overflow-x-auto px-6 md:order-1 md:mx-0 md:w-auto md:flex-1 md:overflow-visible md:px-0">
             <BoardLink label="Find work" href="/dashboard/opportunities" />
             <BoardLink label="Find workers" href="/dashboard/workers" />
             <a
               href="https://www.agoraonnim.site/whitepaper.pdf"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex shrink-0 items-center gap-1.5 whitespace-nowrap font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground"
+              className={NAV_LINK}
             >
               <span className="text-subtle-foreground transition-colors group-hover:text-[#3bb143]">//</span>
               Read docs
