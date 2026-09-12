@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/lib/types'
 
@@ -25,6 +25,8 @@ interface SessionValue {
   recent: NotificationRow[]
   /** Opening the notification list is the act of having seen them. */
   markAllRead: () => Promise<void>
+  /** Clear one tab's dot. Called when its page is opened. */
+  markTabRead: (tab: string) => Promise<void>
   /** Re-read the counts now, rather than waiting for the next poll. */
   refreshNotifications: () => Promise<void>
 }
@@ -36,6 +38,8 @@ export interface NotificationRow {
   body: string
   href?: string | null
   createdAt: string
+  /** Kept in the list once seen, shown quieter, so the history survives. */
+  read?: boolean
 }
 
 const SessionContext = createContext<SessionValue | null>(null)
@@ -51,6 +55,7 @@ export function useSession(): SessionValue {
 
 export default function SessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [unread, setUnread] = useState<Record<string, number>>({})
@@ -116,8 +121,46 @@ export default function SessionProvider({ children }: { children: React.ReactNod
     }
   }, [user, readNotifications])
 
+  // Opening the page a notification is about is seeing it, and that is what
+  // takes the dot off the tab. The delay is the difference between arriving
+  // somewhere and passing through it: a redirect that lands on Deals on its
+  // way to a deal should not count as having read what was waiting there.
+  const markTabRead = useCallback(async (tab: string) => {
+    setUnread((prev) => {
+      if (!prev[tab]) return prev
+      const next = { ...prev }
+      delete next[tab]
+      return next
+    })
+    setRecent((prev) => prev.map((n) => (n.tab === tab ? { ...n, read: true } : n)))
+    try {
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ tab }),
+      })
+    } catch {
+      // Still unread server-side, so the dot comes back on the next poll.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    // Only tabs that actually have something waiting, and only the one being
+    // looked at. Matching on the record's own keys keeps this to the handful
+    // of hrefs notifications are filed under.
+    const here = Object.keys(unread).find(
+      (href) => unread[href] > 0 && (pathname === href || pathname.startsWith(`${href}/`)),
+    )
+    if (!here) return
+    const timer = setTimeout(() => markTabRead(here), 1200)
+    return () => clearTimeout(timer)
+  }, [pathname, unread, user, markTabRead])
+
   const markAllRead = useCallback(async () => {
     setUnread({})
+    setRecent((prev) => prev.map((n) => ({ ...n, read: true })))
     try {
       await fetch('/api/notifications', {
         method: 'POST',
@@ -141,6 +184,7 @@ export default function SessionProvider({ children }: { children: React.ReactNod
         unread,
         recent,
         markAllRead,
+        markTabRead,
         refreshNotifications: readNotifications,
       }}
     >

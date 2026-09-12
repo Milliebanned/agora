@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 import { useSession } from '@/components/SessionProvider'
+import UnreadDot from '@/components/ui/unread-dot'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -64,11 +65,7 @@ export default function NotificationBell({
         className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
       >
         <Bell className="h-4 w-4" />
-        {waiting > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#3bb143] px-1 text-[10px] font-medium tabular-nums text-white">
-            {waiting > 9 ? '9+' : waiting}
-          </span>
-        )}
+        {waiting > 0 && <UnreadDot className="absolute right-1 top-1" />}
       </button>
 
       {open && (
@@ -76,8 +73,11 @@ export default function NotificationBell({
             'absolute z-50 mt-2 w-[min(340px,calc(100vw-32px))] overflow-hidden rounded-lg border border-border bg-card shadow-float',
             align === 'left' ? 'left-0' : 'right-0',
           )}>
-          <div className="border-b border-border px-4 py-2.5">
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="text-[13px] font-medium tracking-body">Notifications</span>
+            {waiting > 0 && (
+              <span className="text-[12px] text-[#eb5757]">{waiting} new</span>
+            )}
           </div>
 
           {recent.length === 0 ? (
@@ -99,10 +99,23 @@ export default function NotificationBell({
                     i > 0 && 'border-t border-border',
                   )}
                 >
-                  <span className="text-[13px] leading-snug text-secondary-foreground">
+                  <span
+                    className={cn(
+                      'flex items-start gap-2 text-[13px] leading-snug',
+                      n.read ? 'text-muted-foreground' : 'text-secondary-foreground',
+                    )}
+                  >
+                    {/* The dot is the only thing separating what is new from
+                        what was already here the last time they looked. */}
+                    {!n.read && <UnreadDot className="mt-[5px] shrink-0 ring-card" />}
                     {n.body}
                   </span>
-                  <span className="text-[11.5px] text-subtle-foreground">
+                  <span
+                    className={cn(
+                      'text-[11.5px] text-subtle-foreground',
+                      !n.read && 'pl-[18px]',
+                    )}
+                  >
                     {formatDate(n.createdAt)}
                   </span>
                 </button>

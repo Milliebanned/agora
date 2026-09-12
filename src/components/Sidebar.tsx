@@ -5,20 +5,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { useSession } from '@/components/SessionProvider'
 import NotificationBell from '@/components/NotificationBell'
+import UnreadDot from '@/components/ui/unread-dot'
 import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
-
-// A count next to the tab it belongs to. Capped at 9+ because the exact
-// number stops mattering well before then — what matters is that something
-// is waiting.
-function NavBadge({ count }: { count: number }) {
-  if (!count) return null
-  return (
-    <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3bb143] px-1 text-[11px] font-medium tabular-nums text-white">
-      {count > 9 ? '9+' : count}
-    </span>
-  )
-}
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -70,7 +59,14 @@ export default function Sidebar() {
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 {item.label}
-                <NavBadge count={unread[item.href] ?? 0} />
+                {(unread[item.href] ?? 0) > 0 && (
+                  <>
+                    <UnreadDot className="ml-auto mr-0.5" />
+                    <span className="sr-only">
+                      {unread[item.href]} new
+                    </span>
+                  </>
+                )}
               </span>
             </Link>
           )

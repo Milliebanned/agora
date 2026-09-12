@@ -19,12 +19,26 @@ export async function GET(request: NextRequest) {
     const counts: Record<string, number> = {}
     for (const row of grouped) counts[row.tab] = row._count._all
 
-    const recent = await prisma.notification.findMany({
-      where: { userId: user.userId, readAt: null },
+    // Read ones included. The counts drive the dots, which have to disappear
+    // once somebody has looked; the list is a history, and a history that
+    // erases an item the moment it is seen is no use to anyone trying to work
+    // out what happened while they were away.
+    const rows = await prisma.notification.findMany({
+      where: { userId: user.userId },
       orderBy: { createdAt: 'desc' },
       take: 20,
-      select: { id: true, tab: true, type: true, body: true, href: true, createdAt: true },
+      select: {
+        id: true,
+        tab: true,
+        type: true,
+        body: true,
+        href: true,
+        createdAt: true,
+        readAt: true,
+      },
     })
+
+    const recent = rows.map(({ readAt, ...row }) => ({ ...row, read: readAt !== null }))
 
     return NextResponse.json({ counts, recent })
   } catch (error) {

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { useSession } from '@/components/SessionProvider'
 import NotificationBell from '@/components/NotificationBell'
+import UnreadDot from '@/components/ui/unread-dot'
 import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
@@ -33,6 +34,7 @@ export function MobileTopBar() {
       </Link>
 
       <div className="flex items-center gap-1">
+        <NotificationBell align="right" />
         <Link href={primary.href}>
           <span className="flex h-8 items-center gap-1.5 rounded-md bg-[#3bb143] px-3 text-[13px] font-medium text-white">
             <PrimaryIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -48,14 +50,6 @@ export function MobileTopBar() {
         </button>
       </div>
     </header>
-  )
-}
-
-// A dot rather than a number: a tab bar item is too small to read a count on,
-// and "something is waiting here" is the whole message anyway.
-function TabDot() {
-  return (
-    <span className="absolute right-[20%] top-[8px] h-2.5 w-2.5 rounded-full bg-[#3bb143] ring-2 ring-background" />
   )
 }
 
@@ -80,6 +74,7 @@ export function MobileTabBar() {
       {tabs.map((tab) => {
         const active =
           tab.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(tab.href)
+        const waiting = unread[tab.href] ?? 0
         return (
           <Link key={tab.href} href={tab.href}>
             <span
@@ -88,8 +83,12 @@ export function MobileTabBar() {
                 active ? 'text-[#3bb143]' : 'text-muted-foreground',
               )}
             >
-              <tab.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={active ? 2.4 : 2} />
+              <span className="relative">
+                <tab.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={active ? 2.4 : 2} />
+                {waiting > 0 && <UnreadDot className="absolute -right-1.5 -top-1" />}
+              </span>
               <span className="max-w-full truncate text-[10px] leading-none">{tab.label}</span>
+              {waiting > 0 && <span className="sr-only">{waiting} new</span>}
             </span>
           </Link>
         )
