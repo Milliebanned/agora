@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Send, Check, X, Star, Clock } from 'lucide-react'
+import { Send, Check, X, Star, Clock, Link as LinkIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -216,6 +216,18 @@ function ClientView({
                 {p.coverLetter}
               </p>
 
+              {p.portfolioUrl && (
+                <a
+                  href={p.portfolioUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2.5 flex w-fit items-center gap-2 text-[13px] text-accent hover:underline"
+                >
+                  <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Portfolio</span>
+                </a>
+              )}
+
               {(() => {
                 const topup = Math.max(0, Number(p.bidNIM) - funded)
                 return (
@@ -276,6 +288,7 @@ function FreelancerView({
   onError: (message: string) => void
 }) {
   const [coverLetter, setCoverLetter] = useState(existing?.coverLetter ?? '')
+  const [portfolioUrl, setPortfolioUrl] = useState(existing?.portfolioUrl ?? '')
   const [bid, setBid] = useState(existing ? String(Number(existing.bidNIM)) : String(budget))
   const [days, setDays] = useState(
     existing ? String(existing.deliveryDays) : String(opportunity.timelineDays ?? 7),
@@ -294,6 +307,7 @@ function FreelancerView({
         credentials: 'include',
         body: JSON.stringify({
           coverLetter,
+          portfolioUrl,
           bidNIM: Number(bid),
           deliveryDays: Number(days),
         }),
@@ -335,6 +349,17 @@ function FreelancerView({
           <p className="mt-4 whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
             {existing.coverLetter}
           </p>
+          {existing.portfolioUrl && (
+            <a
+              href={existing.portfolioUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex w-fit items-center gap-2 text-[13px] text-accent hover:underline"
+            >
+              <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{existing.portfolioUrl}</span>
+            </a>
+          )}
           {existing.status === 'pending' && opportunity.status === 'open' && (
             <Button variant="secondary" size="sm" className="mt-4" onClick={() => setEditing(true)}>
               Revise proposal
@@ -364,6 +389,24 @@ function FreelancerView({
             className="mt-2"
             placeholder="What you would build, how you would sequence it, and anything relevant you have done before."
             required
+          />
+        </div>
+
+        <div>
+          <label className="text-[13px] font-medium text-secondary-foreground">
+            Portfolio link <span className="text-subtle-foreground">(optional)</span>
+          </label>
+          <p className="mt-0.5 text-[12px] text-subtle-foreground">
+            Work you have already done. The client is deciding whether to lock money with a
+            stranger, and this is the fastest way to stop being one.
+          </p>
+          <Input
+            type="url"
+            inputMode="url"
+            value={portfolioUrl}
+            onChange={(e) => setPortfolioUrl(e.target.value)}
+            placeholder="https://your-portfolio.com"
+            className="mt-2"
           />
         </div>
 
