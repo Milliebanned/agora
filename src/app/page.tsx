@@ -64,7 +64,7 @@ const STEPS = [
 ]
 
 export default function Home() {
-  const { connectWallet, loading, error } = useWalletLogin()
+  const { connectWallet, loading, error, walletMissing } = useWalletLogin()
   const [signedIn, setSignedIn] = useState(false)
   // A returning wallet that never picked a side resumes at /onboarding.
   const [resumeHref, setResumeHref] = useState('/dashboard')
@@ -185,6 +185,49 @@ export default function Home() {
                   See how it works →
                 </a>
               </div>
+              {walletMissing && (
+                <div className="mt-5 max-w-xl rounded-lg border border-border bg-card p-4">
+                  <p className="text-[14px] font-medium tracking-body">
+                    Agora runs inside Nimiq Pay
+                  </p>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+                    Your wallet lives in the Nimiq Pay app, which is where signing in happens. It is
+                    free, takes a minute to set up, and is the only thing you need to start.
+                  </p>
+                  <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                    <a
+                      href="https://nimiq.com/nimiq-pay"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button size="sm">
+                        Get Nimiq Pay
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </a>
+                    <a
+                      href="https://apps.apple.com/app/id6471844738"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md border border-border px-2.5 py-1.5 font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground"
+                    >
+                      iPhone
+                    </a>
+                    <a
+                      href="https://play.google.com/store/apps/details?id=com.nimiq.pay"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md border border-border px-2.5 py-1.5 font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground"
+                    >
+                      Android
+                    </a>
+                  </div>
+                  <p className="mt-3 text-[12px] text-subtle-foreground">
+                    Already have it? Open this page from inside the app to sign in.
+                  </p>
+                </div>
+              )}
+
               {error && <p className="mt-4 text-[13px] text-destructive">{error}</p>}
             </div>
 
