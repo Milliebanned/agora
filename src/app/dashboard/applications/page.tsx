@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Compass, Send, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { StatusBadge } from '@/components/ui/badge'
+import { Badge, StatusBadge } from '@/components/ui/badge'
 import { PageHeader, EmptyState, PageLoading } from '@/components/ui/page'
 import { useSession } from '@/components/SessionProvider'
 import { categoryLabel } from '@/lib/opportunities'
@@ -18,6 +18,7 @@ interface AppliedRow {
   status: string
   amountNIM: string | number
   budgetNIM: string | number | null
+  invitedSellerId?: string | null
   timelineDays: number | null
   sellerId: string | null
   buyer?: { displayName: string | null }
@@ -107,7 +108,12 @@ export default function ApplicationsPage() {
         <div className="overflow-hidden rounded-lg shadow-hairline">
           {rows.map((row, i) => {
             const proposal = row.proposals?.[0]
-            const { label, note } = outcome(proposal?.status ?? 'pending', Boolean(row.sellerId))
+            // A client hired straight from this freelancer's advertisement, so
+            // there is no pitch to report on: the job is waiting on them.
+            const invitedOnly = Boolean(row.invitedSellerId) && !proposal
+            const { label, note } = invitedOnly
+              ? { label: 'Sent to you', note: 'A client sent this to you from your advertisement.' }
+              : outcome(proposal?.status ?? 'pending', Boolean(row.sellerId))
             return (
               <Link key={row.id} href={`/dashboard/opportunities/${row.id}`}>
                 <div
@@ -119,7 +125,11 @@ export default function ApplicationsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge status={label} />
+                        {invitedOnly ? (
+                          <Badge tone="accent">Sent to you</Badge>
+                        ) : (
+                          <StatusBadge status={label} />
+                        )}
                         <span className="text-[12px] text-subtle-foreground">
                           {categoryLabel(row.category)}
                         </span>

@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
-import { useSession, useClearTabOnArrival } from '@/components/SessionProvider'
+import { useSession } from '@/components/SessionProvider'
+import NotificationBell from '@/components/NotificationBell'
 import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
@@ -28,8 +29,6 @@ export default function Sidebar() {
   const primary = primaryActionForRole(role)
   const PrimaryIcon = primary.icon
 
-  useClearTabOnArrival(nav)
-
   const disconnect = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
     router.push('/')
@@ -37,11 +36,14 @@ export default function Sidebar() {
 
   return (
     <nav className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col border-r border-border bg-background px-3 py-4 lg:flex">
-      <Link href="/dashboard" className="mb-6 flex items-center gap-2 px-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="" className="h-6 w-6" />
-        <span className="text-[15px] font-medium tracking-body">Agora</span>
-      </Link>
+      <div className="mb-6 flex items-center justify-between px-2">
+        <Link href="/dashboard" className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="" className="h-6 w-6" />
+          <span className="text-[15px] font-medium tracking-body">Agora</span>
+        </Link>
+        <NotificationBell align="left" />
+      </div>
 
       <Link href={primary.href} className="mb-4">
         <span className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-[#3bb143] text-[13px] font-medium text-white transition hover:brightness-110">

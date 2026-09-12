@@ -33,10 +33,15 @@ export async function GET(request: NextRequest) {
     } else if (scope === 'assigned') {
       where.sellerId = user.userId
     } else if (scope === 'applied') {
-      // Everything this user has pitched for. `assigned` only covers work
-      // already won, so without this a freelancer has nowhere to see a proposal
-      // that is still pending — or one that was turned down.
-      where.proposals = { some: { freelancerId: user.userId } }
+      // Everything this user has pitched for, plus anything sent straight to
+      // them. `assigned` only covers work already won, so without this a
+      // freelancer has nowhere to see a proposal that is still pending, one
+      // that was turned down, or a job a client addressed to them and is
+      // waiting on.
+      where.OR = [
+        { proposals: { some: { freelancerId: user.userId } } },
+        { invitedSellerId: user.userId },
+      ]
     } else {
       where.status = 'open'
       where.publishedAt = { not: null }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Megaphone, Plus, X, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { Megaphone, Plus, X, Eye, EyeOff, Trash2, Briefcase } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -357,11 +357,17 @@ export default function AdvertisementsPage() {
                         {listing.description}
                       </p>
                       {(listing.deals ?? 0) > 0 && (
-                        <p className="mt-2 text-[12px] text-subtle-foreground">
-                          {listing.deals} deal{listing.deals === 1 ? '' : 's'} came from this
-                          {(listing.liveDeals ?? 0) > 0
-                            ? ` · ${listing.liveDeals} still running`
-                            : ''}
+                        <p className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-secondary-foreground">
+                          <Briefcase className="h-3.5 w-3.5 text-[#98fb98]" />
+                          <span>
+                            <span className="font-medium text-foreground">{listing.deals}</span>{' '}
+                            deal{listing.deals === 1 ? '' : 's'} came from this
+                          </span>
+                          {(listing.liveDeals ?? 0) > 0 && (
+                            <span className="text-[#98fb98]">
+                              · {listing.liveDeals} still running
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>

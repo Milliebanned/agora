@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, Bell } from 'lucide-react'
-import { useSession, useClearTabOnArrival } from '@/components/SessionProvider'
+import { LogOut } from 'lucide-react'
+import { useSession } from '@/components/SessionProvider'
+import NotificationBell from '@/components/NotificationBell'
 import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
@@ -13,8 +14,7 @@ import { cn } from '@/lib/utils'
 
 export function MobileTopBar() {
   const router = useRouter()
-  const { role, unread } = useSession()
-  const waiting = Object.values(unread).reduce((sum, n) => sum + n, 0)
+  const { role } = useSession()
 
   const primary = primaryActionForRole(role)
   const PrimaryIcon = primary.icon
@@ -65,7 +65,6 @@ export function MobileTabBar() {
 
   const tabs = navForRole(role)
 
-  useClearTabOnArrival(tabs)
 
   return (
     <nav

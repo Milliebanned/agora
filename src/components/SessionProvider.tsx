@@ -21,10 +21,21 @@ interface SessionValue {
   refresh: () => Promise<void>
   /** Unread count per nav href, for the badge next to each tab. */
   unread: Record<string, number>
-  /** Opening a tab is the act of having seen what was waiting under it. */
-  markTabRead: (tab: string) => Promise<void>
+  /** The latest notifications, read or not, for the bell. */
+  recent: NotificationRow[]
+  /** Opening the notification list is the act of having seen them. */
+  markAllRead: () => Promise<void>
   /** Re-read the counts now, rather than waiting for the next poll. */
   refreshNotifications: () => Promise<void>
+}
+
+export interface NotificationRow {
+  id: string
+  tab: string
+  type: string
+  body: string
+  href?: string | null
+  createdAt: string
 }
 
 const SessionContext = createContext<SessionValue | null>(null)
@@ -43,6 +54,7 @@ export default function SessionProvider({ children }: { children: React.ReactNod
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [unread, setUnread] = useState<Record<string, number>>({})
+  const [recent, setRecent] = useState<NotificationRow[]>([])
 
   const read = useCallback(
     async (redirectWhenRoleless: boolean) => {
@@ -78,8 +90,9 @@ export default function SessionProvider({ children }: { children: React.ReactNod
     try {
       const res = await fetch('/api/notifications', { credentials: 'include' })
       if (!res.ok) return
-      const { counts } = await res.json()
+      const { counts, recent: rows } = await res.json()
       setUnread(counts ?? {})
+      setRecent(rows ?? [])
     } catch {
       // A badge that fails to load is not worth surfacing to anyone.
     }
@@ -103,24 +116,19 @@ export default function SessionProvider({ children }: { children: React.ReactNod
     }
   }, [user, readNotifications])
 
-  const markTabRead = useCallback(
-    async (tab: string) => {
-      // Clear it locally first; the badge should go the moment the page opens,
-      // not a round trip later.
-      setUnread((prev) => (prev[tab] ? { ...prev, [tab]: 0 } : prev))
-      try {
-        await fetch('/api/notifications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ tab }),
-        })
-      } catch {
-        // It stays unread server-side and comes back on the next poll.
-      }
-    },
-    [],
-  )
+  const markAllRead = useCallback(async () => {
+    setUnread({})
+    try {
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ all: true }),
+      })
+    } catch {
+      // They stay unread server-side and come back on the next poll.
+    }
+  }, [])
 
   return (
     <SessionContext.Provider
@@ -131,39 +139,12 @@ export default function SessionProvider({ children }: { children: React.ReactNod
         loading,
         refresh,
         unread,
-        markTabRead,
+        recent,
+        markAllRead,
         refreshNotifications: readNotifications,
       }}
     >
       {children}
     </SessionContext.Provider>
   )
-}
-
-// Clearing a tab's badge when you arrive at it — and only then.
-//
-// Marking it read on every render would wipe a notification that arrived while
-// you were already sitting on the page, which looks exactly like the badge
-// never working at all. Anything that lands while you are here keeps its badge
-// until you come back to the tab, which is the only moment we can honestly say
-// you went looking.
-export function useClearTabOnArrival(tabs: { href: string }[]) {
-  const { unread, markTabRead } = useSession()
-  const pathname = usePathname()
-  const lastCleared = useRef<string | null>(null)
-
-  useEffect(() => {
-    const match = tabs.find((t) => t.href !== '/dashboard' && pathname.startsWith(t.href))
-    const href = match?.href ?? null
-    if (!href) {
-      lastCleared.current = null
-      return
-    }
-    if (lastCleared.current === href) return
-    lastCleared.current = href
-    if (unread[href]) markTabRead(href)
-    // `unread` is deliberately not a dependency: this runs when the tab you are
-    // on changes, not when a count does.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, markTabRead])
 }

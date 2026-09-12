@@ -42,8 +42,18 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const where: Record<string, unknown> = { userId: user.userId, readAt: null }
-    if (typeof body.tab === 'string') where.tab = body.tab
-    if (typeof body.agreementId === 'string') where.agreementId = body.agreementId
+    // `all` is explicit on purpose. An empty body used to mean "everything",
+    // so any malformed call silently wiped the lot.
+    if (body.all !== true) {
+      if (typeof body.tab === 'string') where.tab = body.tab
+      if (typeof body.agreementId === 'string') where.agreementId = body.agreementId
+      if (!where.tab && !where.agreementId) {
+        return NextResponse.json(
+          { error: 'Name what to mark read: a tab, an agreement, or all.' },
+          { status: 400 },
+        )
+      }
+    }
 
     const { count } = await prisma.notification.updateMany({
       where,
