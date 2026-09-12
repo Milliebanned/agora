@@ -10,6 +10,7 @@ export interface ProposalRow {
   id: string
   freelancerId: string
   coverLetter: string
+  portfolioUrl?: string | null
   bidNIM: string | number
   deliveryDays: number
   status: 'pending' | 'accepted' | 'rejected' | 'withdrawn'

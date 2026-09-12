@@ -23,7 +23,7 @@ import ProposalPanel from '@/components/opportunity/ProposalPanel'
 import WorkPanel from '@/components/opportunity/WorkPanel'
 import ChatPanel from '@/components/opportunity/ChatPanel'
 import type { OpportunityDetail } from '@/components/opportunity/types'
-import { categoryLabel, isEngaged, parseAttachments } from '@/lib/opportunities'
+import { categoryLabel, isEngaged, parseAttachments, splitAttachments } from '@/lib/opportunities'
 import { formatDate, parseJsonArray, shortAddress } from '@/lib/utils'
 import { FALLBACK_ERROR } from '@/lib/messages'
 
@@ -93,7 +93,7 @@ export default function OpportunityDetailPage() {
   }
 
   const deliverables = parseJsonArray(opportunity.deliverables)
-  const attachments = parseAttachments(opportunity.attachments)
+  const { brief: attachments } = splitAttachments(parseAttachments(opportunity.attachments))
   const budget = Number(opportunity.budgetNIM ?? opportunity.amountNIM)
   const withdraw = async () => {
     setWithdrawing(true)

@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
-import { useSession } from '@/components/SessionProvider'
+import { useSession, useClearTabOnArrival } from '@/components/SessionProvider'
 import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
@@ -22,18 +21,14 @@ function NavBadge({ count }: { count: number }) {
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { role, unread, markTabRead } = useSession()
+  const { role, unread } = useSession()
   const router = useRouter()
 
   const nav = navForRole(role)
   const primary = primaryActionForRole(role)
   const PrimaryIcon = primary.icon
 
-  // Being on a tab means having seen what was waiting under it.
-  useEffect(() => {
-    const match = nav.find((item) => item.href !== '/dashboard' && pathname.startsWith(item.href))
-    if (match && unread[match.href]) markTabRead(match.href)
-  }, [pathname, nav, unread, markTabRead])
+  useClearTabOnArrival(nav)
 
   const disconnect = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})

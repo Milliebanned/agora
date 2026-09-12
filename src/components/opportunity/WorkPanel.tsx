@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Scale, Upload, Plus, X } from 'lucide-react'
+import { CheckCircle2, Scale, Upload, Plus, X, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/page'
 import { formatDate, parseJsonArray } from '@/lib/utils'
+import { parseAttachments, splitAttachments } from '@/lib/opportunities'
 import { MESSAGES } from '@/lib/messages'
 import type { OpportunityDetail } from './types'
 
@@ -26,6 +27,7 @@ export default function WorkPanel({
   onError: (message: string) => void
 }) {
   const { isClient, isFreelancer } = opportunity.viewer
+  const { delivered } = splitAttachments(parseAttachments(opportunity.attachments))
   const [summary, setSummary] = useState(opportunity.workSubmission ?? '')
   const [links, setLinks] = useState<{ label: string; url: string }[]>([])
   const [busy, setBusy] = useState<string | null>(null)
@@ -119,6 +121,29 @@ export default function WorkPanel({
             <p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed text-secondary-foreground">
               {opportunity.workSubmission}
             </p>
+
+            {delivered.length > 0 && (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="mb-2 text-[12px] font-medium text-secondary-foreground">
+                  Delivered {delivered.length === 1 ? 'link' : 'links'}
+                </p>
+                <ul className="space-y-1.5">
+                  {delivered.map((a, i) => (
+                    <li key={i}>
+                      <a
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-[13px] text-accent hover:underline"
+                      >
+                        <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{a.label}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 

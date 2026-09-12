@@ -226,3 +226,22 @@ export function isOpenForProposals(status: string): boolean {
 export function isEngaged(status: string): boolean {
   return status === 'locked' || status === 'submitted' || status === 'disputed'
 }
+
+// Links added when the work was handed in are stored on the posting alongside
+// the brief's own attachments, marked by this prefix. They belong with the
+// submitted work, not with the requirements — reading the brief should not mean
+// scrolling past the delivery.
+export const DELIVERED_PREFIX = 'Delivered: '
+
+export function splitAttachments(all: Array<{ label: string; url: string }>) {
+  const brief: Array<{ label: string; url: string }> = []
+  const delivered: Array<{ label: string; url: string }> = []
+  for (const a of all) {
+    if (a.label.startsWith(DELIVERED_PREFIX)) {
+      delivered.push({ ...a, label: a.label.slice(DELIVERED_PREFIX.length) })
+    } else {
+      brief.push(a)
+    }
+  }
+  return { brief, delivered }
+}

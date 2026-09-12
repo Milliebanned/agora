@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/lib/types'
 
 export interface SessionUser {
@@ -23,6 +23,8 @@ interface SessionValue {
   unread: Record<string, number>
   /** Opening a tab is the act of having seen what was waiting under it. */
   markTabRead: (tab: string) => Promise<void>
+  /** Re-read the counts now, rather than waiting for the next poll. */
+  refreshNotifications: () => Promise<void>
 }
 
 const SessionContext = createContext<SessionValue | null>(null)
@@ -84,12 +86,21 @@ export default function SessionProvider({ children }: { children: React.ReactNod
   }, [])
 
   // Polled rather than pushed: the dashboard is a WebView on a phone that
-  // sleeps, and a missed socket would leave the badge permanently wrong.
+  // sleeps, and a missed socket would leave the badge permanently wrong. The
+  // same reason it re-reads on focus — a phone that was asleep for an hour
+  // should not show an hour-old count for another fifteen seconds.
   useEffect(() => {
     if (!user) return
     readNotifications()
-    const timer = setInterval(readNotifications, 30_000)
-    return () => clearInterval(timer)
+    const timer = setInterval(readNotifications, 15_000)
+    const onFocus = () => readNotifications()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [user, readNotifications])
 
   const markTabRead = useCallback(
@@ -121,9 +132,38 @@ export default function SessionProvider({ children }: { children: React.ReactNod
         refresh,
         unread,
         markTabRead,
+        refreshNotifications: readNotifications,
       }}
     >
       {children}
     </SessionContext.Provider>
   )
+}
+
+// Clearing a tab's badge when you arrive at it — and only then.
+//
+// Marking it read on every render would wipe a notification that arrived while
+// you were already sitting on the page, which looks exactly like the badge
+// never working at all. Anything that lands while you are here keeps its badge
+// until you come back to the tab, which is the only moment we can honestly say
+// you went looking.
+export function useClearTabOnArrival(tabs: { href: string }[]) {
+  const { unread, markTabRead } = useSession()
+  const pathname = usePathname()
+  const lastCleared = useRef<string | null>(null)
+
+  useEffect(() => {
+    const match = tabs.find((t) => t.href !== '/dashboard' && pathname.startsWith(t.href))
+    const href = match?.href ?? null
+    if (!href) {
+      lastCleared.current = null
+      return
+    }
+    if (lastCleared.current === href) return
+    lastCleared.current = href
+    if (unread[href]) markTabRead(href)
+    // `unread` is deliberately not a dependency: this runs when the tab you are
+    // on changes, not when a count does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, markTabRead])
 }

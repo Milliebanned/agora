@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut } from 'lucide-react'
-import { useSession } from '@/components/SessionProvider'
+import { LogOut, Bell } from 'lucide-react'
+import { useSession, useClearTabOnArrival } from '@/components/SessionProvider'
 import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +13,8 @@ import { cn } from '@/lib/utils'
 
 export function MobileTopBar() {
   const router = useRouter()
-  const { role } = useSession()
+  const { role, unread } = useSession()
+  const waiting = Object.values(unread).reduce((sum, n) => sum + n, 0)
 
   const primary = primaryActionForRole(role)
   const PrimaryIcon = primary.icon
@@ -55,21 +55,17 @@ export function MobileTopBar() {
 // and "something is waiting here" is the whole message anyway.
 function TabDot() {
   return (
-    <span className="absolute right-[22%] top-[10px] h-2 w-2 rounded-full bg-[#3bb143] ring-2 ring-background" />
+    <span className="absolute right-[20%] top-[8px] h-2.5 w-2.5 rounded-full bg-[#3bb143] ring-2 ring-background" />
   )
 }
 
 export function MobileTabBar() {
   const pathname = usePathname()
-  const { role, unread, markTabRead } = useSession()
+  const { role, unread } = useSession()
 
   const tabs = navForRole(role)
 
-  // Being on a tab means having seen what was waiting under it.
-  useEffect(() => {
-    const match = tabs.find((t) => t.href !== '/dashboard' && pathname.startsWith(t.href))
-    if (match && unread[match.href]) markTabRead(match.href)
-  }, [pathname, tabs, unread, markTabRead])
+  useClearTabOnArrival(tabs)
 
   return (
     <nav

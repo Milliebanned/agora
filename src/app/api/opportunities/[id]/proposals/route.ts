@@ -82,6 +82,7 @@ export async function POST(
 
     const body = await request.json()
     const coverLetter = String(body.coverLetter ?? '').trim()
+    const portfolioRaw = String(body.portfolioUrl ?? '').trim()
     const bidNIM = Number(body.bidNIM)
     const deliveryDays = Number(body.deliveryDays)
 
@@ -94,6 +95,9 @@ export async function POST(
     // funded amount can ever lock without the escrow actually covering it.
     if (!Number.isInteger(deliveryDays) || deliveryDays < 1)
       problems.push('Delivery time must be at least 1 day')
+    // Optional, but if given it has to be somewhere a browser can actually go.
+    if (portfolioRaw && !/^https?:\/\/\S+$/i.test(portfolioRaw))
+      problems.push('Portfolio link must start with http:// or https://')
 
     if (problems.length > 0) {
       return NextResponse.json({ error: problems[0], problems }, { status: 400 })
@@ -107,12 +111,14 @@ export async function POST(
         agreementId: id,
         freelancerId: user.userId,
         coverLetter: coverLetter.slice(0, 4000),
+        portfolioUrl: portfolioRaw ? portfolioRaw.slice(0, 500) : null,
         bidNIM,
         deliveryDays,
         status: 'pending',
       },
       update: {
         coverLetter: coverLetter.slice(0, 4000),
+        portfolioUrl: portfolioRaw ? portfolioRaw.slice(0, 500) : null,
         bidNIM,
         deliveryDays,
         status: 'pending',

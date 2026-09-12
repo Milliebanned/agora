@@ -157,7 +157,10 @@ model Proposal {
   freelancer   User   @relation("Freelancer", fields: [freelancerId], references: [id])
 
   coverLetter  String  @db.Text
-  bidNIM       Decimal // never above the posted budget — the escrow is already committed
+  // Where the client can see work this freelancer has already done. The single
+  // most useful thing a stranger can offer alongside a price.
+  portfolioUrl String?
+  bidNIM       Decimal
   deliveryDays Int
   status       String  @default("pending") // pending, accepted, rejected, withdrawn
 
