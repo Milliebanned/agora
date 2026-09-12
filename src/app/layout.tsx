@@ -1,10 +1,20 @@
 import type { Metadata } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Inter, JetBrains_Mono, Newsreader } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  display: 'swap',
+})
+
+// The whitepaper's cover face. Used only where the page speaks in its own
+// voice, which is the hero headline and nothing else.
+const display = Newsreader({
+  subsets: ['latin'],
+  variable: '--font-display',
+  weight: ['300', '400'],
+  style: ['normal', 'italic'],
   display: 'swap',
 })
 
@@ -26,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${mono.variable} ${display.variable}`}>
       <body className="bg-background text-foreground font-sans antialiased">{children}</body>
     </html>
   )
