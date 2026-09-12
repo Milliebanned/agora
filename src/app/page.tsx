@@ -76,19 +76,57 @@ export default function Home() {
       .catch(() => setSignedIn(false))
   }, [])
 
+  // A board link: a real link once there is a wallet to browse with, and the
+  // connect prompt before that.
+  const BoardLink = ({ label, href }: { label: string; href: string }) => {
+    const inner = (
+      <>
+        <span className="text-subtle-foreground transition-colors group-hover:text-[#3bb143]">//</span>
+        {label}
+      </>
+    )
+    const className =
+      'group flex shrink-0 items-center gap-1.5 whitespace-nowrap font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50'
+
+    return signedIn ? (
+      <Link href={href} className={className}>
+        {inner}
+      </Link>
+    ) : (
+      <button type="button" onClick={connectWallet} disabled={loading} className={className}>
+        {inner}
+      </button>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-content items-center justify-between px-6">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-3 md:h-14 md:flex-nowrap md:py-0">
+          {/* Both boards are behind the wallet, so on a signed-out visit these
+              ask for the wallet rather than leading somewhere that would just
+              bounce them back. */}
+          <nav className="order-3 -mx-6 flex w-full items-center gap-5 overflow-x-auto px-6 md:order-1 md:mx-0 md:w-auto md:flex-1 md:overflow-visible md:px-0">
+            <BoardLink label="Find work" href="/dashboard/opportunities" />
+            <BoardLink label="Find workers" href="/dashboard/workers" />
+            <a
+              href="https://www.agoraonnim.site/whitepaper.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex shrink-0 items-center gap-1.5 whitespace-nowrap font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <span className="text-subtle-foreground transition-colors group-hover:text-[#3bb143]">//</span>
+              Read docs
+            </a>
+          </nav>
+
+          <div className="order-1 flex items-center gap-2 md:order-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="" className="h-6 w-6" />
             <span className="text-[15px] font-medium tracking-body">Agora</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-[13px] text-muted-foreground sm:block">
-              Nimiq Pay Mini App
-            </span>
+
+          <div className="order-2 flex items-center gap-2 md:order-3 md:flex-1 md:justify-end">
             {signedIn ? (
               <Link href={resumeHref}>
                 <Button size="sm">Open dashboard</Button>
