@@ -69,10 +69,23 @@ export default function NotificationBell({
       </button>
 
       {open && (
-        <div className={cn(
-            'absolute z-50 mt-2 w-[min(340px,calc(100vw-32px))] overflow-hidden rounded-lg border border-border bg-card shadow-float',
-            align === 'left' ? 'left-0' : 'right-0',
-          )}>
+        <div
+          className={cn(
+            'overflow-hidden rounded-lg border border-border bg-card shadow-float',
+            // On a phone the bell sits in the middle of the top bar, with the
+            // primary action and the disconnect button to its right. A panel
+            // hung off that button's own edge is wider than the space left of
+            // it, so it ran off the side of the screen. Here it spans the page
+            // under the bar instead. The top bar is the containing block for
+            // this (it carries a backdrop filter), but its padding box is the
+            // full width at the top of the screen, so these insets land in the
+            // same place either way.
+            'fixed inset-x-3 top-[60px] z-50',
+            // From the sidebar up there is room to hang it off the button.
+            'lg:absolute lg:inset-x-auto lg:top-auto lg:mt-2 lg:w-[340px]',
+            align === 'left' ? 'lg:left-0' : 'lg:right-0',
+          )}
+        >
           <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <span className="text-[13px] font-medium tracking-body">Notifications</span>
             {waiting > 0 && (
@@ -85,7 +98,7 @@ export default function NotificationBell({
               Nothing yet. Proposals, messages and decisions on your deals show up here.
             </p>
           ) : (
-            <div className="max-h-[340px] overflow-y-auto">
+            <div className="max-h-[min(60vh,340px)] overflow-y-auto overscroll-contain">
               {recent.map((n, i) => (
                 <button
                   key={n.id}
