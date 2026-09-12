@@ -200,9 +200,20 @@ export default function DisputeDetailPage() {
 
   // Shown to both sides in NIM as well as percent: a split reads very
   // differently as "60%" than as "the 300 NIM you are not getting".
-  const percent = dispute.freelancerPercent ?? 0
+  //
+  // A platform mediator's ruling is binding, and it is the number the
+  // settlement code actually pays out, so once one exists every figure on this
+  // page has to come from it. Reading the AI's recommendation instead showed a
+  // case ruled 70/30 as a clean 100% to one side while the two wallets
+  // received the real split.
+  const ruledByHuman = typeof dispute.humanRulingPercent === 'number'
+  const hasSplit = ruledByHuman || typeof dispute.freelancerPercent === 'number'
+  const percent = ruledByHuman
+    ? (dispute.humanRulingPercent as number)
+    : (dispute.freelancerPercent ?? 0)
   const freelancerShare = (dispute.amountNIM * percent) / 100
   const clientShare = dispute.amountNIM - freelancerShare
+  const settled = dispute.status === 'resolved'
 
   return (
     <>
@@ -300,38 +311,39 @@ export default function DisputeDetailPage() {
               </div>
             )}
 
-            {typeof dispute.freelancerPercent === 'number' &&
-              dispute.recommendedOutcome !== 'escalate' && (
-                <div>
-                  <p className="mb-2 text-[13px] font-medium text-secondary-foreground">
-                    How the escrow would be divided
-                  </p>
-                  <div className="flex h-2 overflow-hidden rounded-full bg-border">
-                    <div
-                      className="bg-success"
-                      style={{ width: `${dispute.freelancerPercent}%` }}
-                    />
-                    <div
-                      className="bg-accent"
-                      style={{ width: `${100 - dispute.freelancerPercent}%` }}
-                    />
-                  </div>
-                  <div className="mt-2.5 flex justify-between text-[13px]">
-                    <span className="text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {freelancerShare.toFixed(2)} NIM
-                      </span>{' '}
-                      to the freelancer ({dispute.freelancerPercent}%)
-                    </span>
-                    <span className="text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {clientShare.toFixed(2)} NIM
-                      </span>{' '}
-                      to the client ({100 - dispute.freelancerPercent}%)
-                    </span>
-                  </div>
+            {/* A ruling is shown whatever the AI called, escalation included:
+                a mediator ruling on an escalated case is exactly the situation
+                where the split on screen has to be the one that was paid. */}
+            {hasSplit && (ruledByHuman || dispute.recommendedOutcome !== 'escalate') && (
+              <div>
+                <p className="mb-2 text-[13px] font-medium text-secondary-foreground">
+                  {settled ? 'How the escrow was divided' : 'How the escrow would be divided'}
+                </p>
+                <div className="flex h-2 overflow-hidden rounded-full bg-border">
+                  <div className="bg-success" style={{ width: `${percent}%` }} />
+                  <div className="bg-accent" style={{ width: `${100 - percent}%` }} />
                 </div>
-              )}
+                <div className="mt-2.5 flex flex-wrap justify-between gap-x-4 gap-y-1 text-[13px]">
+                  <span className="text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {freelancerShare.toFixed(2)} NIM
+                    </span>{' '}
+                    to the freelancer ({percent}%)
+                  </span>
+                  <span className="text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {clientShare.toFixed(2)} NIM
+                    </span>{' '}
+                    to the client ({100 - percent}%)
+                  </span>
+                </div>
+                {ruledByHuman && (
+                  <p className="mt-2 text-[12px] text-muted-foreground">
+                    Set by the platform mediator's ruling, not by the AI recommendation above.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* The mediator declined to call it. Nothing to accept, and saying
                 so plainly beats offering a button that would refuse. */}
@@ -572,7 +584,8 @@ export default function DisputeDetailPage() {
                 <div className="flex items-center gap-2">
                   <Gavel className="h-4 w-4 shrink-0 text-success" />
                   <p className="text-[13px] font-medium text-success">
-                    Human mediator’s ruling — {dispute.humanRulingPercent}% to the freelancer
+                    Platform mediator’s ruling: {dispute.humanRulingPercent}% to the freelancer,{' '}
+                    {100 - (dispute.humanRulingPercent ?? 0)}% to the client
                   </p>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-secondary-foreground">
@@ -590,15 +603,17 @@ export default function DisputeDetailPage() {
               <div className="flex items-start gap-2.5 rounded-md border border-success/25 bg-success/[0.06] p-4">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 <p className="text-[13px] leading-relaxed text-secondary-foreground">
-                  Both parties accepted the verdict and the escrow was paid out on-chain
-                  {typeof dispute.freelancerPercent === 'number' && (
+                  {ruledByHuman
+                    ? 'A platform mediator ruled on this case and the escrow was paid out on-chain'
+                    : 'Both parties accepted the verdict and the escrow was paid out on-chain'}
+                  {hasSplit ? (
                     <>
-                      {' '}
-                      — {freelancerShare.toFixed(2)} NIM to the freelancer,{' '}
-                      {clientShare.toFixed(2)} NIM to the client
+                      : {freelancerShare.toFixed(2)} NIM to the freelancer,{' '}
+                      {clientShare.toFixed(2)} NIM to the client.
                     </>
+                  ) : (
+                    '.'
                   )}
-                  .
                 </p>
               </div>
             )}
