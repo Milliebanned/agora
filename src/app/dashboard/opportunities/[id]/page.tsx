@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft,
+  Ban,
   AlertTriangle,
   CheckCircle2,
   Paperclip,
@@ -169,45 +170,6 @@ export default function OpportunityDetailPage() {
           <span>Posted {formatDate(opportunity.publishedAt ?? opportunity.createdAt)}</span>
         </p>
 
-        {withdrawable && (
-          <div className="mt-4">
-            {confirmingWithdraw ? (
-              <div className="rounded-lg border border-destructive/25 bg-destructive/[0.05] p-4">
-                <p className="text-[13px] font-medium text-secondary-foreground">
-                  Withdraw this posting?
-                </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  {opportunity.status === 'open'
-                    ? `It comes off the board, any proposals on it are declined, and the ${committed.toFixed(2)} NIM in escrow is sent back to your wallet.`
-                    : 'It is a draft, so nothing was ever committed and nothing is returned.'}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={withdrawing}
-                    onClick={withdraw}
-                  >
-                    {withdrawing ? <Spinner className="h-3.5 w-3.5" /> : null}
-                    {withdrawing ? 'Withdrawing' : 'Yes, withdraw it'}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={withdrawing}
-                    onClick={() => setConfirmingWithdraw(false)}
-                  >
-                    Keep it up
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button variant="secondary" size="sm" onClick={() => setConfirmingWithdraw(true)}>
-                Withdraw posting
-              </Button>
-            )}
-          </div>
-        )}
       </div>
 
       <Card>
@@ -332,6 +294,69 @@ export default function OpportunityDetailPage() {
           )}
 
           {(isParty || isMediator) && <ChatPanel opportunity={opportunity} />}
+
+          {withdrawable && (
+            <Card className="shadow-[inset_0_0_0_1px_rgb(235_87_87_/_0.30)]">
+              <div className="border-b border-destructive/20 bg-destructive/[0.04] px-5 py-3.5">
+                <span className="flex items-center gap-2 text-[15px] font-medium tracking-body">
+                  <Ban className="h-4 w-4 text-destructive" />
+                  Withdraw this posting
+                </span>
+              </div>
+              <div className="p-5">
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  {opportunity.status === 'open' ? (
+                    <>
+                      It comes off the board and stops taking proposals. Anyone who has already
+                      pitched is told it was withdrawn, and the{' '}
+                      <span className="font-mono tabular-nums text-secondary-foreground">
+                        {committed.toFixed(2)} NIM
+                      </span>{' '}
+                      held in escrow is sent back to your wallet.
+                    </>
+                  ) : (
+                    'This is still a draft, so no budget was ever committed and nothing needs to be returned.'
+                  )}
+                </p>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+                  You can do this right up until you hire someone. After that the work has started
+                  against it, and a dispute is the way out instead.
+                </p>
+
+                {confirmingWithdraw ? (
+                  <div className="mt-4 rounded-lg bg-destructive/[0.06] p-4">
+                    <p className="text-[13px] font-medium text-secondary-foreground">
+                      {opportunity.status === 'open'
+                        ? `Withdraw it and send ${committed.toFixed(2)} NIM back?`
+                        : 'Withdraw this draft?'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button variant="destructive" disabled={withdrawing} onClick={withdraw}>
+                        {withdrawing ? <Spinner className="h-4 w-4" /> : null}
+                        {withdrawing ? 'Withdrawing' : 'Yes, withdraw it'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={withdrawing}
+                        onClick={() => setConfirmingWithdraw(false)}
+                      >
+                        Keep it up
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="destructive"
+                    className="mt-4 w-full sm:w-auto"
+                    onClick={() => setConfirmingWithdraw(true)}
+                  >
+                    <Ban className="h-4 w-4" />
+                    Withdraw posting
+                  </Button>
+                )}
+              </div>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-3">
