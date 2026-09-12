@@ -8,15 +8,19 @@ export function useWalletLogin() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // Told apart from other failures on purpose: there is nothing to retry and
+  // nothing the person did wrong, they just do not have the app yet.
+  const [walletMissing, setWalletMissing] = useState(false)
 
   const connectWallet = async () => {
     setLoading(true)
     setError('')
+    setWalletMissing(false)
 
     try {
       const accounts = await getAccounts()
       if (!accounts || accounts.length === 0) {
-        setError('No wallet found. Please open in Nimiq Pay.')
+        setWalletMissing(true)
         setLoading(false)
         return
       }
@@ -78,5 +82,5 @@ export function useWalletLogin() {
     }
   }
 
-  return { connectWallet, loading, error }
+  return { connectWallet, loading, error, walletMissing }
 }

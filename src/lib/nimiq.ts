@@ -190,7 +190,7 @@ export async function sendBasicTransaction(
     return {
       ok: false,
       reason:
-        'No Nimiq Pay wallet is connected. Open this Mini App inside Nimiq Pay — a desktop browser has no wallet to ask.',
+        'No Nimiq Pay wallet is connected. Open Agora inside the Nimiq Pay app: a desktop browser has no wallet to ask.',
     }
   }
 
