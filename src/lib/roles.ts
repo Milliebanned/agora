@@ -97,7 +97,7 @@ export const ROLE_PRIMARY_ACTION: Record<UserRole, PrimaryAction> = {
   },
   client: {
     href: '/dashboard/opportunities/new',
-    label: 'Post opportunity',
+    label: 'Post job',
     shortLabel: 'New',
     icon: Plus,
   },
