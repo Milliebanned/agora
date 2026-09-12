@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
 
 export async function GET(
@@ -50,19 +51,28 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const session = request.cookies.get('session')?.value
+    const session = await requireSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    // A cookie proved somebody is signed in; it did not prove they are this
+    // person. Without this check any signed-in wallet could rewrite anyone
+    // else's name and bio by passing their id.
+    if (session.userId !== id) {
+      return NextResponse.json({ error: 'You can only edit your own profile' }, { status: 403 })
+    }
 
-    // Would verify session here
-    const { displayName, bio } = await request.json()
+    const body = await request.json()
+    const displayName =
+      typeof body.displayName === 'string' ? body.displayName.trim().slice(0, 60) : undefined
+    const bio = typeof body.bio === 'string' ? body.bio.trim().slice(0, 600) : undefined
 
     const user = await prisma.user.update({
-      where: { id: id },
+      where: { id },
       data: {
-        ...(displayName && { displayName }),
-        ...(bio && { bio }),
+        // Empty is a real choice: it clears a name rather than being ignored.
+        ...(displayName !== undefined && { displayName: displayName || null }),
+        ...(bio !== undefined && { bio: bio || null }),
       },
     })
 

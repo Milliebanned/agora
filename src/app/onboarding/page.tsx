@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Briefcase, Check, Search, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input, Textarea } from '@/components/ui/input'
 import { PageLoading, Spinner } from '@/components/ui/page'
 import { shortAddress } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
@@ -42,6 +43,13 @@ const OPTIONS: {
 export default function OnboardingPage() {
   const router = useRouter()
   const [address, setAddress] = useState('')
+  const [userId, setUserId] = useState('')
+  // Two steps, shown once: pick a side, then say who you are. The second is
+  // skippable because a wallet that just wants to look around should not be
+  // held at a form, and everything on it is editable later in the profile.
+  const [step, setStep] = useState<'side' | 'details'>('side')
+  const [displayName, setDisplayName] = useState('')
+  const [bio, setBio] = useState('')
   const [selected, setSelected] = useState<UserRole | null>(null)
   const [checking, setChecking] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -62,6 +70,7 @@ export default function OnboardingPage() {
           return
         }
         setAddress(user.address)
+        setUserId(user.id)
         setChecking(false)
       } catch {
         router.replace('/')
@@ -84,6 +93,36 @@ export default function OnboardingPage() {
       if (!res.ok) {
         const detail = await res.text().catch(() => '')
         setError(`Could not save your choice (${res.status}). ${detail.slice(0, 200)}`)
+        setSaving(false)
+        return
+      }
+      // The side is saved. Asking who they are comes next, and reloading from
+      // here lands them on the dashboard rather than repeating this.
+      setStep('details')
+      setSaving(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setSaving(false)
+    }
+  }
+
+  const saveDetails = async () => {
+    if (!displayName.trim() && !bio.trim()) {
+      router.push('/dashboard')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ displayName: displayName.trim(), bio: bio.trim() }),
+      })
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '')
+        setError(`Could not save your details (${res.status}). ${detail.slice(0, 200)}`)
         setSaving(false)
         return
       }
@@ -114,6 +153,81 @@ export default function OnboardingPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
+        {step === 'details' ? (
+          <>
+            <p className="font-mono text-[12px] text-subtle-foreground">Step 2 of 2</p>
+            <h1 className="mt-3 text-heading-sm font-medium tracking-heading">
+              Who are people dealing with?
+            </h1>
+            <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
+              A wallet address tells a stranger nothing. A name and a line about what you do is the
+              difference between a proposal someone reads and one they scroll past. You can skip
+              this and add it later from your profile.
+            </p>
+
+            <div className="mt-10 max-w-xl space-y-5">
+              <div>
+                <label
+                  htmlFor="onboarding-name"
+                  className="text-[13px] font-medium text-secondary-foreground"
+                >
+                  Display name
+                </label>
+                <p className="mt-0.5 text-[12px] text-subtle-foreground">
+                  Shown on your proposals, your postings and your profile.
+                </p>
+                <Input
+                  id="onboarding-name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Jane Mensah"
+                  maxLength={60}
+                  className="mt-2"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="onboarding-bio"
+                  className="text-[13px] font-medium text-secondary-foreground"
+                >
+                  Short bio
+                </label>
+                <p className="mt-0.5 text-[12px] text-subtle-foreground">
+                  What you do, and anything that would make someone pick you.
+                </p>
+                <Textarea
+                  id="onboarding-bio"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  rows={4}
+                  maxLength={600}
+                  placeholder="Product designer, eight years on fintech and wallets. I work in small scopes and ship fast."
+                  className="mt-2"
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button size="lg" onClick={saveDetails} disabled={saving}>
+                {saving ? <Spinner className="h-4 w-4" /> : null}
+                {saving ? 'Saving' : 'Save and continue'}
+                {!saving && <ArrowRight className="h-4 w-4" />}
+              </Button>
+              <Button
+                size="lg"
+                variant="secondary"
+                disabled={saving}
+                onClick={() => router.push('/dashboard')}
+              >
+                Skip for now
+              </Button>
+            </div>
+
+            {error && <p className="mt-4 text-[13px] text-destructive">{error}</p>}
+          </>
+        ) : (
+          <>
         <p className="font-mono text-[12px] text-subtle-foreground">Wallet connected</p>
         <h1 className="mt-3 text-heading-sm font-medium tracking-heading">
           Which side are you on?
@@ -188,6 +302,8 @@ export default function OnboardingPage() {
         </div>
 
         {error && <p className="mt-4 text-[13px] text-destructive">{error}</p>}
+          </>
+        )}
       </main>
     </div>
   )
