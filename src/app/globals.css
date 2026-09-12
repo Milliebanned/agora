@@ -15,38 +15,62 @@
    cards flat against the page, so there a soft shadow carries it. Both live in
    --shadow-card, which is why nothing that uses it has to know which theme is
    on. */
+/* Each colour is stored as bare channels and composed into a colour beside
+   it. Both spellings are load-bearing: Tailwind can only apply an opacity
+   modifier (bg-accent/10, ring-accent/15) to a colour it can take apart, so it
+   is given the channels, while anything writing plain CSS or an inline style
+   wants a colour and uses the composed one. With only the composed form, every
+   /opacity class in the app silently produced nothing at all. */
 :root {
-  --background: #08090a;
-  --card: #101314;
-  --surface: #171b1c;
-  --border: #23282a;
-  --border-strong: #383f41;
+  --background-rgb: 8 9 10;
+  --background: rgb(var(--background-rgb));
+  --card-rgb: 16 19 20;
+  --card: rgb(var(--card-rgb));
+  --surface-rgb: 23 27 28;
+  --surface: rgb(var(--surface-rgb));
+  --border-rgb: 35 40 42;
+  --border: rgb(var(--border-rgb));
+  --border-strong-rgb: 56 63 65;
+  --border-strong: rgb(var(--border-strong-rgb));
 
-  --foreground: #ffffff;
-  --secondary-foreground: #d0d6e0;
-  --muted-foreground: #8a8f98;
-  --subtle-foreground: #62666d;
+  --foreground-rgb: 255 255 255;
+  --foreground: rgb(var(--foreground-rgb));
+  --secondary-foreground-rgb: 208 214 224;
+  --secondary-foreground: rgb(var(--secondary-foreground-rgb));
+  --muted-foreground-rgb: 138 143 152;
+  --muted-foreground: rgb(var(--muted-foreground-rgb));
+  --subtle-foreground-rgb: 98 102 109;
+  --subtle-foreground: rgb(var(--subtle-foreground-rgb));
 
-  --muted: #171b1c;
+  --muted-rgb: 23 27 28;
+  --muted: rgb(var(--muted-rgb));
 
   /* The brand green, the same one the landing page and every primary button
      already use. It was an acid yellow here, which is why the dashboard never
      looked like the rest of the product. */
-  --accent: #3bb143;
-  --accent-foreground: #ffffff;
+  --accent-rgb: 59 177 67;
+  --accent: rgb(var(--accent-rgb));
+  --accent-foreground-rgb: 255 255 255;
+  --accent-foreground: rgb(var(--accent-foreground-rgb));
   /* The lit version, for a figure that should catch the eye on a dark ground.
      In the light theme it has to darken instead: #98fb98 on white is invisible. */
-  --accent-bright: #98fb98;
+  --accent-bright-rgb: 152 251 152;
+  --accent-bright: rgb(var(--accent-bright-rgb));
   /* A wash of the accent, for chips and the tinted panel behind a headline
      figure. Carried as a token because the light theme needs far more of it
      than a 10% alpha gives. */
   --accent-wash: rgba(59, 177, 67, 0.12);
 
-  --success: #27a644;
-  --destructive: #eb5757;
-  --info: #02b8cc;
-  --violet: #6366f1;
-  --lavender: #8b5cf6;
+  --success-rgb: 39 166 68;
+  --success: rgb(var(--success-rgb));
+  --destructive-rgb: 235 87 87;
+  --destructive: rgb(var(--destructive-rgb));
+  --info-rgb: 2 184 204;
+  --info: rgb(var(--info-rgb));
+  --violet-rgb: 99 102 241;
+  --violet: rgb(var(--violet-rgb));
+  --lavender-rgb: 139 92 246;
+  --lavender: rgb(var(--lavender-rgb));
 
   /* Hover and pressed fills. Hardcoded white alphas were fine while there was
      only ever black underneath; in the light theme they wash a surface out. */
@@ -65,29 +89,47 @@
   /* Not white. A near-white with a trace of the brand green in it, so the page
      reads as the same product with the lights on rather than as a default
      stylesheet. */
-  --background: #eef2ee;
-  --card: #ffffff;
-  --surface: #f5f8f5;
-  --border: #dfe6e0;
-  --border-strong: #c3cec5;
+  --background-rgb: 238 242 238;
+  --background: rgb(var(--background-rgb));
+  --card-rgb: 255 255 255;
+  --card: rgb(var(--card-rgb));
+  --surface-rgb: 245 248 245;
+  --surface: rgb(var(--surface-rgb));
+  --border-rgb: 223 230 224;
+  --border: rgb(var(--border-rgb));
+  --border-strong-rgb: 195 206 197;
+  --border-strong: rgb(var(--border-strong-rgb));
 
-  --foreground: #0d1411;
-  --secondary-foreground: #34423a;
-  --muted-foreground: #5f6d64;
-  --subtle-foreground: #87948b;
+  --foreground-rgb: 13 20 17;
+  --foreground: rgb(var(--foreground-rgb));
+  --secondary-foreground-rgb: 52 66 58;
+  --secondary-foreground: rgb(var(--secondary-foreground-rgb));
+  --muted-foreground-rgb: 95 109 100;
+  --muted-foreground: rgb(var(--muted-foreground-rgb));
+  --subtle-foreground-rgb: 135 148 139;
+  --subtle-foreground: rgb(var(--subtle-foreground-rgb));
 
-  --muted: #f5f8f5;
+  --muted-rgb: 245 248 245;
+  --muted: rgb(var(--muted-rgb));
 
-  --accent: #2f9c38;
-  --accent-foreground: #ffffff;
-  --accent-bright: #1c7a2c;
+  --accent-rgb: 47 156 56;
+  --accent: rgb(var(--accent-rgb));
+  --accent-foreground-rgb: 255 255 255;
+  --accent-foreground: rgb(var(--accent-foreground-rgb));
+  --accent-bright-rgb: 28 122 44;
+  --accent-bright: rgb(var(--accent-bright-rgb));
   --accent-wash: rgba(47, 156, 56, 0.1);
 
-  --success: #1f8b38;
-  --destructive: #cc3b3b;
-  --info: #0e8fa0;
-  --violet: #5b5fd6;
-  --lavender: #7c4ddb;
+  --success-rgb: 31 139 56;
+  --success: rgb(var(--success-rgb));
+  --destructive-rgb: 204 59 59;
+  --destructive: rgb(var(--destructive-rgb));
+  --info-rgb: 14 143 160;
+  --info: rgb(var(--info-rgb));
+  --violet-rgb: 91 95 214;
+  --violet: rgb(var(--violet-rgb));
+  --lavender-rgb: 124 77 219;
+  --lavender: rgb(var(--lavender-rgb));
 
   --elevate: rgba(13, 20, 17, 0.045);
   --elevate-strong: rgba(13, 20, 17, 0.09);
