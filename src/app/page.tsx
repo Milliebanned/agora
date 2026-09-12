@@ -54,7 +54,7 @@ const FEATURES = [
 
 // Outlined by default, and the outline only takes the brand colour on hover.
 const NAV_LINK =
-  'group flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-2.5 py-1.5 font-mono text-[12px] tracking-[0.06em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground disabled:opacity-50'
+  'group flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-1.5 py-1.5 font-mono text-[11.5px] tracking-[0.04em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground disabled:opacity-50 sm:px-2.5 sm:text-[12px] sm:tracking-[0.06em]'
 
 const STEPS = [
   ['Connect', 'Sign in with your Nimiq Pay wallet. No password, no signup form.'],
@@ -107,7 +107,7 @@ export default function Home() {
           {/* Both boards are behind the wallet, so on a signed-out visit these
               ask for the wallet rather than leading somewhere that would just
               bounce them back. */}
-          <nav className="order-3 -mx-6 flex w-full items-center gap-2 overflow-x-auto px-6 md:order-1 md:mx-0 md:w-auto md:flex-1 md:overflow-visible md:px-0">
+          <nav className="order-3 flex w-full flex-wrap items-center gap-1.5 md:order-1 md:w-auto md:flex-1 md:flex-nowrap md:gap-2">
             <BoardLink label="Find work" href="/dashboard/opportunities" />
             <BoardLink label="Find workers" href="/dashboard/workers" />
             <a
@@ -158,7 +158,7 @@ export default function Home() {
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="relative z-10">
               <h1 className="max-w-2xl text-[44px] font-bold uppercase leading-[1.05] tracking-tight sm:text-[64px]">
-                Trust, between strangers.
+                Trust between strangers
               </h1>
               <p className="mt-6 max-w-xl text-body-lg font-normal text-muted-foreground">
                 Hire, collaborate, and get paid with confidence.
