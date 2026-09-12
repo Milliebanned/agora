@@ -2,25 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Linear-inspired system: darkness is the substrate, not a theme.
-   Elevation comes from hairline borders and surface progression
-   (void -> carbon -> obsidian -> graphite), not layered shadows. */
+/* Two themes over one set of variables.
+   
+   Dark is the default and the bare :root, because the product is dark
+   everywhere outside the dashboard: the landing page is built around a lit
+   globe on black and has no light counterpart. The dashboard is the one place
+   somebody sits for an hour at a time, so it is the one place that offers a
+   choice, and the choice is carried as data-theme on <html>.
+
+   Elevation differs by theme rather than by component. In the dark the surface
+   progression and a hairline do the work; in the light a hairline alone leaves
+   cards flat against the page, so there a soft shadow carries it. Both live in
+   --shadow-card, which is why nothing that uses it has to know which theme is
+   on. */
 :root {
   --background: #08090a;
-  --card: #0f1011;
-  --surface: #161718;
-  --border: #23252a;
-  --border-strong: #383b3f;
+  --card: #101314;
+  --surface: #171b1c;
+  --border: #23282a;
+  --border-strong: #383f41;
 
   --foreground: #ffffff;
   --secondary-foreground: #d0d6e0;
   --muted-foreground: #8a8f98;
   --subtle-foreground: #62666d;
 
-  --muted: #161718;
+  --muted: #171b1c;
 
-  --accent: #e4f222;
-  --accent-foreground: #08090a;
+  /* The brand green, the same one the landing page and every primary button
+     already use. It was an acid yellow here, which is why the dashboard never
+     looked like the rest of the product. */
+  --accent: #3bb143;
+  --accent-foreground: #ffffff;
+  /* The lit version, for a figure that should catch the eye on a dark ground.
+     In the light theme it has to darken instead: #98fb98 on white is invisible. */
+  --accent-bright: #98fb98;
+  /* A wash of the accent, for chips and the tinted panel behind a headline
+     figure. Carried as a token because the light theme needs far more of it
+     than a 10% alpha gives. */
+  --accent-wash: rgba(59, 177, 67, 0.12);
 
   --success: #27a644;
   --destructive: #eb5757;
@@ -28,8 +48,55 @@
   --violet: #6366f1;
   --lavender: #8b5cf6;
 
-  --radius: 12px;
-  --radius-control: 6px;
+  /* Hover and pressed fills. Hardcoded white alphas were fine while there was
+     only ever black underneath; in the light theme they wash a surface out. */
+  --elevate: rgba(255, 255, 255, 0.04);
+  --elevate-strong: rgba(255, 255, 255, 0.09);
+
+  --shadow-card: inset 0 0 0 1px var(--border);
+  --shadow-raised: inset 0 0 0 1px var(--border);
+  --shadow-float: rgba(0, 0, 0, 0.6) 0px 4px 32px;
+
+  --radius: 14px;
+  --radius-control: 8px;
+}
+
+:root[data-theme='light'] {
+  /* Not white. A near-white with a trace of the brand green in it, so the page
+     reads as the same product with the lights on rather than as a default
+     stylesheet. */
+  --background: #eef2ee;
+  --card: #ffffff;
+  --surface: #f5f8f5;
+  --border: #dfe6e0;
+  --border-strong: #c3cec5;
+
+  --foreground: #0d1411;
+  --secondary-foreground: #34423a;
+  --muted-foreground: #5f6d64;
+  --subtle-foreground: #87948b;
+
+  --muted: #f5f8f5;
+
+  --accent: #2f9c38;
+  --accent-foreground: #ffffff;
+  --accent-bright: #1c7a2c;
+  --accent-wash: rgba(47, 156, 56, 0.1);
+
+  --success: #1f8b38;
+  --destructive: #cc3b3b;
+  --info: #0e8fa0;
+  --violet: #5b5fd6;
+  --lavender: #7c4ddb;
+
+  --elevate: rgba(13, 20, 17, 0.045);
+  --elevate-strong: rgba(13, 20, 17, 0.09);
+
+  /* The hairline stays: it is what keeps a divided list reading as one
+     object. The shadow is what lifts the object off the page. */
+  --shadow-card: inset 0 0 0 1px var(--border), 0 1px 2px rgba(13, 20, 17, 0.04);
+  --shadow-raised: inset 0 0 0 1px var(--border), 0 6px 20px rgba(13, 20, 17, 0.08);
+  --shadow-float: rgba(13, 20, 17, 0.14) 0px 8px 32px;
 }
 
 * {
@@ -38,6 +105,29 @@
 
 html {
   color-scheme: dark;
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* Only when somebody actually flips the switch. A theme that animates while
+   the page is loading is a flash with extra steps. */
+html.theme-switching,
+html.theme-switching body,
+html.theme-switching * {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-switching,
+  html.theme-switching body,
+  html.theme-switching * {
+    transition: none;
+  }
 }
 
 body {
@@ -59,13 +149,14 @@ body {
   letter-spacing: -0.011em;
 }
 
-/* Cards carry an inset hairline instead of an outer drop shadow. */
+/* Cards carry an inset hairline in the dark and a soft shadow in the light.
+   Both spellings resolve through the same token. */
 .ring-hairline {
   box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .shadow-float {
-  box-shadow: rgba(8, 9, 10, 0.6) 0px 4px 32px;
+  box-shadow: var(--shadow-float);
 }
 
 /* Slow independent float cycles for the decorative scene behind the

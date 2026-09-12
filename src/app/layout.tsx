@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono, Newsreader } from 'next/font/google'
+import { THEME_SCRIPT } from '@/lib/theme'
 import './globals.css'
 
 const inter = Inter({
@@ -36,7 +37,16 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable} ${display.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${inter.variable} ${mono.variable} ${display.variable}`}
+    >
+      <head>
+        {/* Before the first paint, so nobody watches the dashboard load dark
+            and then turn light. See src/lib/theme.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="bg-background text-foreground font-sans antialiased">{children}</body>
     </html>
   )

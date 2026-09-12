@@ -179,7 +179,7 @@ export default function EscrowPanel({
       </div>
 
       <div className="p-5">
-        <div className="flex items-center justify-between rounded-md bg-white/[0.03] px-4 py-3.5">
+        <div className="flex items-center justify-between rounded-md bg-elevate px-4 py-3.5">
           <span className="text-[13px] text-secondary-foreground">
             {stage === 'unfunded' ? 'Budget to pay' : 'Amount'}
           </span>

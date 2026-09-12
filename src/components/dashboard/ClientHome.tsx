@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Banknote, Lock, Plus, Megaphone, ShieldCheck, Undo2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { StatTile, EmptyState } from '@/components/ui/page'
 import DealList, { type DealRow } from './DealList'
+import MoneyBreakdown from './MoneyBreakdown'
 import type { DashboardDeal } from '@/app/dashboard/page'
 
 interface PostingRow {
@@ -94,40 +95,65 @@ export default function ClientHome({
   return (
     <>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Live postings" value={live.length} hint="taking proposals" />
-        <StatTile label="In progress" value={active.length} hint="freelancer engaged" />
+        <StatTile
+          label="Live postings"
+          value={live.length}
+          hint="taking proposals"
+          icon={Megaphone}
+        />
+        <StatTile
+          label="In progress"
+          value={active.length}
+          hint="freelancer engaged"
+          icon={Users}
+        />
+        {/* What your money is doing right now is the question this screen
+            exists to answer, so it is the figure that gets filled. */}
         <StatTile
           label="In escrow"
           value={(ledger?.inEscrow ?? escrowBalance).toFixed(2)}
           hint="NIM being held for you"
-          accent={(ledger?.inEscrow ?? escrowBalance) > 0}
+          icon={Lock}
+          hero={(ledger?.inEscrow ?? escrowBalance) > 0}
         />
-        <StatTile label="Trust score" value={`${Math.round(trustScore)}`} hint="out of 100" />
+        <StatTile
+          label="Trust score"
+          value={`${Math.round(trustScore)}`}
+          hint="out of 100"
+          icon={ShieldCheck}
+          meter={trustScore / 100}
+        />
       </div>
 
       {/* Money that has already left escrow, split by where it went. Paid and
           returned are both "no longer held" and mean opposite things, so they
-          are never added together. */}
-      {ledger && (ledger.paidOut > 0 || ledger.returned > 0 || ledger.owedToFreelancers > 0) && (
-        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
-          {ledger.owedToFreelancers > 0 && (
-            <StatTile
-              label="Awaiting collection"
-              value={ledger.owedToFreelancers.toFixed(2)}
-              hint="NIM approved, freelancer has not claimed"
-            />
-          )}
-          <StatTile
-            label="Paid to freelancers"
-            value={ledger.paidOut.toFixed(2)}
-            hint="NIM released for work done"
-          />
-          <StatTile
-            label="Returned to you"
-            value={ledger.returned.toFixed(2)}
-            hint="NIM from withdrawals, refunds and mediation"
-          />
-        </div>
+          are never added together, and the bar shows them against each other
+          rather than stacked into one figure. */}
+      {ledger && (
+        <MoneyBreakdown
+          title="Where your budget has gone"
+          total={ledger.paidOut + ledger.returned + ledger.owedToFreelancers}
+          segments={[
+            {
+              label: 'Paid to freelancers',
+              value: ledger.paidOut,
+              hint: 'NIM released for work done',
+              color: 'var(--accent)',
+            },
+            {
+              label: 'Awaiting collection',
+              value: ledger.owedToFreelancers,
+              hint: 'approved, not yet claimed',
+              color: 'var(--accent-bright)',
+            },
+            {
+              label: 'Returned to you',
+              value: ledger.returned,
+              hint: 'withdrawals, refunds and mediation',
+              color: 'var(--subtle-foreground)',
+            },
+          ]}
+        />
       )}
 
       {awaitingReview.length > 0 && (

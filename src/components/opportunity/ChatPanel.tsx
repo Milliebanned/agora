@@ -111,7 +111,7 @@ export default function ChatPanel({ opportunity }: { opportunity: OpportunityDet
                   'max-w-[85%] rounded-lg px-3.5 py-2.5',
                   msg.senderId === opportunity.viewer.id
                     ? 'ml-auto bg-accent/10'
-                    : 'bg-white/[0.04]',
+                    : 'bg-elevate',
                 )}
               >
                 <div className="flex items-baseline gap-2">

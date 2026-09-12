@@ -87,8 +87,8 @@ export default function WorkersPage() {
               className={cn(
                 'h-7 shrink-0 rounded-full px-3 text-[13px] transition-colors',
                 category === c.id
-                  ? 'bg-white/[0.10] text-foreground'
-                  : 'bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-secondary-foreground',
+                  ? 'bg-elevate-strong text-foreground'
+                  : 'bg-elevate text-muted-foreground hover:bg-elevate-strong hover:text-secondary-foreground',
               )}
             >
               {c.label}
@@ -138,7 +138,7 @@ export default function WorkersPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-subtle-foreground">
                         <span className="flex items-center gap-1.5 text-secondary-foreground">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.06] text-[10px]">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-elevate-strong text-[10px]">
                             {name.charAt(0).toUpperCase()}
                           </span>
                           {name}

@@ -141,8 +141,8 @@ export default function OpportunitiesPage() {
               className={cn(
                 'h-8 rounded-md px-3 text-[13px] transition-colors',
                 filters.scope === tab.id
-                  ? 'bg-white/[0.10] text-foreground'
-                  : 'bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-secondary-foreground',
+                  ? 'bg-elevate-strong text-foreground'
+                  : 'bg-elevate text-muted-foreground hover:bg-elevate-strong hover:text-secondary-foreground',
               )}
             >
               {tab.label}
@@ -235,7 +235,7 @@ export default function OpportunitiesPage() {
                         <span
                           className={cn(
                             'flex items-center gap-1',
-                            viewingOwn && proposals > 0 && 'text-[#98fb98]',
+                            viewingOwn && proposals > 0 && 'text-accent-bright',
                           )}
                         >
                           <Users className="h-3 w-3" />

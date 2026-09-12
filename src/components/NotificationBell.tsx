@@ -62,7 +62,7 @@ export default function NotificationBell({
         onClick={toggle}
         aria-label={waiting > 0 ? `${waiting} unread notifications` : 'Notifications'}
         aria-expanded={open}
-        className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
+        className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevate hover:text-foreground"
       >
         <Bell className="h-4 w-4" />
         {waiting > 0 && <UnreadDot className="absolute right-1 top-1" />}

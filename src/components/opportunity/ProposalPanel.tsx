@@ -233,7 +233,7 @@ function ClientView({
                 return (
                   <>
                     {topup > 0 && p.status === 'pending' && (
-                      <p className="mt-2 text-[12px] text-[#98fb98]">
+                      <p className="mt-2 text-[12px] text-accent-bright">
                         {topup.toFixed(2)} NIM above what&apos;s funded — accepting will ask you to
                         pay the difference.
                       </p>
@@ -426,7 +426,7 @@ function FreelancerView({
             <p
               className={cn(
                 'mt-1 text-[12px]',
-                Number(bid) > budget ? 'text-[#98fb98]' : 'text-subtle-foreground',
+                Number(bid) > budget ? 'text-accent-bright' : 'text-subtle-foreground',
               )}
             >
               {Number(bid) > budget

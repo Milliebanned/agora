@@ -362,13 +362,13 @@ export default function AdvertisementsPage() {
                       </p>
                       {(listing.deals ?? 0) > 0 && (
                         <p className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-secondary-foreground">
-                          <Briefcase className="h-3.5 w-3.5 text-[#98fb98]" />
+                          <Briefcase className="h-3.5 w-3.5 text-accent-bright" />
                           <span>
                             <span className="font-medium text-foreground">{listing.deals}</span>{' '}
                             deal{listing.deals === 1 ? '' : 's'} came from this
                           </span>
                           {(listing.liveDeals ?? 0) > 0 && (
-                            <span className="text-[#98fb98]">
+                            <span className="text-accent-bright">
                               · {listing.liveDeals} still running
                             </span>
                           )}

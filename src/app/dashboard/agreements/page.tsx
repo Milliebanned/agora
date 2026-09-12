@@ -103,8 +103,8 @@ export default function DealsPage() {
             className={cn(
               'h-7 shrink-0 rounded-full px-3 text-[13px] transition-colors',
               filter === status
-                ? 'bg-white/[0.10] text-foreground'
-                : 'bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-secondary-foreground',
+                ? 'bg-elevate-strong text-foreground'
+                : 'bg-elevate text-muted-foreground hover:bg-elevate-strong hover:text-secondary-foreground',
             )}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}

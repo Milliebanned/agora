@@ -224,7 +224,7 @@ export default function NewOpportunityPage() {
                       type="button"
                       aria-label="Remove deliverable"
                       onClick={() => setDeliverables((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="flex h-auto w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-destructive"
+                      className="flex h-auto w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevate hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -305,7 +305,7 @@ export default function NewOpportunityPage() {
                       type="button"
                       aria-label="Remove attachment"
                       onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="flex w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-destructive"
+                      className="flex w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevate hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
                     </button>

@@ -164,7 +164,7 @@ export default function ProfilePage() {
       <Card>
         <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-[18px] font-medium">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-elevate-strong text-[18px] font-medium">
               {profile.displayName.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -203,7 +203,7 @@ export default function ProfilePage() {
             <p className={`text-[40px] font-medium leading-none tabular-nums ${scoreTone(score)}`}>
               {score}
             </p>
-            <div className="mt-2 h-1 w-full min-w-[140px] overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="mt-2 h-1 w-full min-w-[140px] overflow-hidden rounded-full bg-elevate-strong">
               <div
                 className={`h-full rounded-full ${score >= 75 ? 'bg-success' : score >= 45 ? 'bg-accent' : 'bg-destructive'}`}
                 style={{ width: `${score}%` }}

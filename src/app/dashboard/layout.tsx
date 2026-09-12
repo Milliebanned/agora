@@ -1,12 +1,14 @@
 import Sidebar from '@/components/Sidebar'
 import SessionProvider from '@/components/SessionProvider'
+import ThemeProvider from '@/components/ThemeProvider'
 import ToastProvider from '@/components/ui/toast'
 import { MobileTabBar, MobileTopBar } from '@/components/MobileNav'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
-      <ToastProvider>
+    <ThemeProvider>
+      <SessionProvider>
+        <ToastProvider>
         <div className="flex min-h-screen bg-background">
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
@@ -18,7 +20,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <MobileTabBar />
         </div>
-      </ToastProvider>
-    </SessionProvider>
+        </ToastProvider>
+      </SessionProvider>
+    </ThemeProvider>
   )
 }

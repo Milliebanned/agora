@@ -30,7 +30,7 @@ const AUTO_DISMISS_MS = 5000
 const MAX_VISIBLE = 3
 
 const KIND_STYLES: Record<ToastKind, { icon: typeof CheckCircle2; className: string }> = {
-  success: { icon: CheckCircle2, className: 'text-[#98fb98]' },
+  success: { icon: CheckCircle2, className: 'text-accent-bright' },
   error: { icon: AlertTriangle, className: 'text-destructive' },
   info: { icon: Info, className: 'text-muted-foreground' },
 }

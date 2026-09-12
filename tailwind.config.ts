@@ -30,6 +30,13 @@ const config: Config = {
         accent: {
           DEFAULT: 'var(--accent)',
           foreground: 'var(--accent-foreground)',
+          bright: 'var(--accent-bright)',
+          wash: 'var(--accent-wash)',
+        },
+        // Hover and pressed fills that used to be hardcoded white alphas.
+        elevate: {
+          DEFAULT: 'var(--elevate)',
+          strong: 'var(--elevate-strong)',
         },
         success: 'var(--success)',
         destructive: 'var(--destructive)',
@@ -59,8 +66,10 @@ const config: Config = {
         semibold: '590',
       },
       boxShadow: {
-        hairline: 'inset 0 0 0 1px var(--border)',
-        float: 'rgba(8, 9, 10, 0.6) 0px 4px 32px',
+        hairline: 'var(--shadow-card)',
+        card: 'var(--shadow-card)',
+        raised: 'var(--shadow-raised)',
+        float: 'var(--shadow-float)',
         soft: 'rgba(0, 0, 0, 0.4) 0px 2px 4px',
       },
       maxWidth: {

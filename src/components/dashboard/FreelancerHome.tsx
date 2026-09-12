@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Compass, Clock, Users } from 'lucide-react'
+import { Briefcase, Clock, Coins, Compass, Send, ShieldCheck, Users, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { StatTile, EmptyState } from '@/components/ui/page'
 import DealList, { type DealRow } from './DealList'
+import MoneyBreakdown from './MoneyBreakdown'
 import { categoryLabel } from '@/lib/opportunities'
 import { cn } from '@/lib/utils'
 import type { DashboardDeal } from '@/app/dashboard/page'
@@ -99,38 +100,61 @@ export default function FreelancerHome({
   return (
     <>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Active work" value={active.length} hint="in progress" />
+        <StatTile label="Active work" value={active.length} hint="in progress" icon={Briefcase} />
         <StatTile
           label="Applications out"
-          value={pendingApplications ?? '—'}
+          value={pendingApplications ?? '0'}
           hint="awaiting a decision"
+          icon={Send}
         />
+        {/* Money with your name on it that you have not taken yet is the one
+            thing on this screen worth interrupting for, so it is the only tile
+            that gets filled. When there is none, it is a tile like the rest. */}
         <StatTile
           label="Ready to claim"
           value={readyToClaim.toFixed(2)}
           hint="NIM approved, not yet collected"
-          accent={readyToClaim > 0}
+          icon={Coins}
+          hero={readyToClaim > 0}
         />
-        <StatTile label="Trust score" value={`${Math.round(trustScore)}`} hint="out of 100" />
+        <StatTile
+          label="Trust score"
+          value={`${Math.round(trustScore)}`}
+          hint="out of 100"
+          icon={ShieldCheck}
+          meter={trustScore / 100}
+        />
       </div>
 
       {/* What the work actually paid. Separate from the row above because
-          everything there is a count of things in flight, and this is money
-          already in the wallet. */}
-      {ledger && (earned > 0 || readyToClaim > 0) && (
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <StatTile
-            label="Earned"
-            value={earned.toFixed(2)}
-            hint={`NIM collected across ${ledger.paidDeals} deal${ledger.paidDeals === 1 ? '' : 's'}`}
-            accent={earned > 0}
-          />
-          <StatTile
-            label="After mediation"
-            value={ledger.mediated.toFixed(2)}
-            hint="NIM of that from settled disputes"
-          />
-        </div>
+          everything there is a count of things in flight, and this is money.
+          Collected and merely approved are kept apart: one is in the wallet
+          and the other is still in escrow. */}
+      {ledger && (
+        <MoneyBreakdown
+          title="What your work has paid"
+          total={earned + readyToClaim}
+          segments={[
+            {
+              label: 'Claimed',
+              value: ledger.claimed,
+              hint: `collected across ${ledger.paidDeals} deal${ledger.paidDeals === 1 ? '' : 's'}`,
+              color: 'var(--accent)',
+            },
+            {
+              label: 'After mediation',
+              value: ledger.mediated,
+              hint: 'from settled disputes',
+              color: 'var(--accent-bright)',
+            },
+            {
+              label: 'Ready to claim',
+              value: readyToClaim,
+              hint: 'approved, still in escrow',
+              color: 'var(--subtle-foreground)',
+            },
+          ]}
+        />
       )}
 
       {claimable.length > 0 && (
@@ -142,7 +166,7 @@ export default function FreelancerHome({
                   ? 'A client approved your work. The escrow is yours to claim.'
                   : `${claimable.length} approved deals are waiting to be claimed.`}
               </p>
-              <span className="shrink-0 font-mono text-[13px] tabular-nums text-[#98fb98]">
+              <span className="shrink-0 font-mono text-[13px] tabular-nums text-accent-bright">
                 {readyToClaim.toFixed(2)} NIM
               </span>
             </div>

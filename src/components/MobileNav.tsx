@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { useSession } from '@/components/SessionProvider'
 import NotificationBell from '@/components/NotificationBell'
+import ThemeToggle from '@/components/ThemeToggle'
 import UnreadDot from '@/components/ui/unread-dot'
 import { navForRole, primaryActionForRole } from '@/lib/roles'
 import { cn } from '@/lib/utils'
@@ -26,17 +27,18 @@ export function MobileTopBar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur-xl lg:hidden">
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card/90 px-4 backdrop-blur-xl lg:hidden">
       <Link href="/dashboard" className="flex items-center gap-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="" className="h-6 w-6" />
         <span className="text-[15px] font-medium tracking-body">Agora</span>
       </Link>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
+        <ThemeToggle />
         <NotificationBell align="right" />
-        <Link href={primary.href}>
-          <span className="flex h-8 items-center gap-1.5 rounded-md bg-[#3bb143] px-3 text-[13px] font-medium text-white">
+        <Link href={primary.href} className="ml-1">
+          <span className="flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-medium text-accent-foreground">
             <PrimaryIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
             {primary.shortLabel}
           </span>
@@ -44,7 +46,7 @@ export function MobileTopBar() {
         <button
           onClick={disconnect}
           aria-label="Disconnect wallet"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-destructive"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevate hover:text-destructive"
         >
           <LogOut className="h-4 w-4" />
         </button>
@@ -62,7 +64,7 @@ export function MobileTabBar() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-background/95 backdrop-blur-xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-card/[0.97] backdrop-blur-xl lg:hidden"
       style={{
         // Tab count varies by role, so the track is set here rather than with a
         // grid-cols-N class Tailwind would have to know about ahead of time.
@@ -79,13 +81,20 @@ export function MobileTabBar() {
           <Link key={tab.href} href={tab.href}>
             <span
               className={cn(
-                'flex h-14 flex-col items-center justify-center gap-1 px-0.5 transition-colors',
-                active ? 'text-[#3bb143]' : 'text-muted-foreground',
+                'flex h-[60px] flex-col items-center justify-center gap-0.5 px-0.5 transition-colors',
+                active ? 'text-accent' : 'text-muted-foreground',
               )}
             >
-              <span className="relative">
+              {/* The pill is the whole active state on a bar this small: at
+                  10px the label cannot carry it on colour alone. */}
+              <span
+                className={cn(
+                  'relative flex h-7 w-11 items-center justify-center rounded-full transition-colors',
+                  active && 'bg-accent-wash',
+                )}
+              >
                 <tab.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={active ? 2.4 : 2} />
-                {waiting > 0 && <UnreadDot className="absolute -right-1.5 -top-1" />}
+                {waiting > 0 && <UnreadDot className="absolute right-1 top-0" />}
               </span>
               <span className="max-w-full truncate text-[10px] leading-none">{tab.label}</span>
               {waiting > 0 && <span className="sr-only">{waiting} new</span>}

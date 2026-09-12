@@ -114,7 +114,7 @@ export default function WorkPanel({
 
       <div className="space-y-4 p-5">
         {opportunity.workSubmission && !showSubmissionForm && (
-          <div className="rounded-md bg-white/[0.03] p-4">
+          <div className="rounded-md bg-elevate p-4">
             <p className="text-[12px] text-subtle-foreground">
               Submitted {opportunity.workSubmittedAt ? formatDate(opportunity.workSubmittedAt) : ''}
             </p>
