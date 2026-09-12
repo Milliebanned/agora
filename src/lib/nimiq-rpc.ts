@@ -31,7 +31,15 @@ async function rpc<T>(method: string, params: unknown[] = []): Promise<T> {
 
   const body = await res.json()
   if (body.error) {
-    throw new RpcError(`Nimiq RPC ${method}: ${body.error.message ?? 'unknown error'}`)
+    // The useful half is often in `data` — this node reports a missing
+    // transaction as a generic "Internal error" whose data says "Transaction
+    // not found". Dropping it turned "this does not exist" into "the node is
+    // broken", which are opposite answers for anything deciding whether money
+    // arrived.
+    const detail = [body.error.message, body.error.data]
+      .filter((part) => typeof part === 'string' && part.length > 0)
+      .join(': ')
+    throw new RpcError(`Nimiq RPC ${method}: ${detail || 'unknown error'}`)
   }
 
   // Albatross wraps results as { data, metadata }; older nodes return the value

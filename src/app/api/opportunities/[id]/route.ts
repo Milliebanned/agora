@@ -4,6 +4,8 @@ import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { payFromEscrow, EscrowConfigError } from '@/lib/escrow-wallet'
 import { notify, TABS } from '@/lib/notifications'
+import { getTransactionByHash, sameAddress } from '@/lib/nimiq-rpc'
+import { nimToSats } from '@/lib/utils'
 
 // Withdrawing a funded posting signs a real refund — @nimiq/core is
 // WebAssembly and needs the Node runtime, not edge.
@@ -157,14 +159,69 @@ export async function PATCH(
         )
       }
 
-      // A draft never cost anything. A published posting did: the budget left
-      // the client's wallet at funding, so withdrawing has to send it back.
-      // Marking the row cancelled without returning the money would strand it
-      // in the escrow wallet with nothing left pointing at it.
-      const funded = await prisma.escrowTransaction.findFirst({
+      // How much of this client's money is actually sitting in escrow?
+      //
+      // This must be answered with evidence, never with an assumption. The
+      // escrow wallet is pooled — every live deal's budget is in it — so
+      // refunding a posting that was never really paid for does not return
+      // anything, it takes somebody else's money and gives it away.
+      //
+      // The trap is that `fund` records a payment *before* confirming it, on
+      // purpose, so that a client whose confirmation call fails is never told
+      // to pay twice. That leaves rows in `pending` whose money may or may not
+      // have arrived, on postings that still read as unfunded drafts. Paying
+      // those out on sight was a way to mint NIM out of a failed request.
+      const fundRow = await prisma.escrowTransaction.findFirst({
         where: { agreementId: id, type: 'fund' },
       })
-      const refundNIM = funded ? Number(opportunity.amountNIM) : 0
+
+      let refundNIM = 0
+      if (fundRow?.status === 'confirmed') {
+        // Refund what was actually paid, not what the posting currently says
+        // it is worth — a draft's budget can be edited after a payment.
+        refundNIM = Number(fundRow.amountNIM ?? opportunity.amountNIM)
+      } else if (fundRow?.status === 'pending' && fundRow.txHash) {
+        // Recorded but never confirmed. Ask the chain now, rather than trust
+        // it or discard it: the money may genuinely be sitting in escrow from
+        // a payment whose confirmation call failed.
+        const escrowAddress = process.env.NIMIQ_ESCROW_ADDRESS
+        const paid = Number(fundRow.amountNIM ?? opportunity.amountNIM)
+        let onChain = null
+        try {
+          onChain = await getTransactionByHash(fundRow.txHash)
+        } catch {
+          // Node unreachable. Refuse rather than guess in either direction:
+          // paying out unverified money is theft from the pool, and cancelling
+          // without paying out loses the client's money if it really did land.
+          return NextResponse.json(
+            {
+              error:
+                'Your funding payment could not be checked against the network just now, so this posting was left exactly as it is. Try withdrawing again in a minute.',
+            },
+            { status: 503 },
+          )
+        }
+
+        const arrived =
+          onChain &&
+          escrowAddress &&
+          sameAddress(onChain.to, escrowAddress) &&
+          BigInt(Math.round(onChain.value)) >= nimToSats(paid)
+
+        if (arrived) {
+          await prisma.escrowTransaction.update({
+            where: { id: fundRow.id },
+            data: { status: 'confirmed', confirmedAt: new Date() },
+          })
+          refundNIM = paid
+        } else {
+          // The payment never landed. There is nothing of this client's in
+          // escrow, so the posting is withdrawn and no money moves.
+          console.warn(
+            `[escrow] withdrawing deal ${id} with an unconfirmed fund payment (${fundRow.txHash}) — nothing arrived on-chain, so nothing is refunded.`,
+          )
+        }
+      }
 
       let refund: { amountNIM: number; txHash: string } | null = null
       if (refundNIM > 0) {
