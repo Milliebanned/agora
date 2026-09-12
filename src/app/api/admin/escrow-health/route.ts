@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     // for a deal that never finished locking, which is worth a human's eyes.
     const stuck = await prisma.escrowTransaction.count({
       where: {
-        type: { in: ['claim', 'refund', 'excess_refund', 'topup'] },
+        type: { in: ['claim', 'refund', 'excess_refund', 'withdraw_refund', 'topup'] },
         status: { in: ['pending', 'failed'] },
       },
     })

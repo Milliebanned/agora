@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { notify, TABS } from '@/lib/notifications'
 import { recordDispute } from '@/lib/reputation'
 import { isPlatformAdmin } from '@/lib/admin'
 
@@ -117,6 +118,15 @@ export async function POST(request: NextRequest) {
     ])
 
     await recordDispute([agreement.buyerId, agreement.sellerId])
+
+    await notify({
+      userId: respondentId,
+      tab: TABS.disputes,
+      type: 'dispute_opened',
+      body: `A dispute was opened on "${agreement.title}". Your response is part of what the mediator reads.`,
+      href: `/dashboard/disputes/${dispute.id}`,
+      agreementId,
+    })
 
     return NextResponse.json(dispute, { status: 201 })
   } catch (error) {

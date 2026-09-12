@@ -4,6 +4,7 @@ import { generateMediatorVerdict, isGeminiConfigured } from '@/lib/gemini'
 import { formatDate, parseJsonArray } from '@/lib/utils'
 import { categoryLabel, parseAttachments } from '@/lib/opportunities'
 import prisma from '@/lib/db'
+import { notifyMany, TABS } from '@/lib/notifications'
 
 // Same reason as the agreement builder: a model call blows past Vercel's 10s
 // default. 60s is the Hobby-plan ceiling.
@@ -202,6 +203,19 @@ Their reason: ${dispute.reason}
           `. ${verdict.case_summary}\n\nThis is a recommendation. It moves nothing until both parties accept it.`,
       },
     })
+
+    // Both sides, because a verdict neither of them has read settles nothing:
+    // it takes effect only once each of them accepts it.
+    await notifyMany(
+      [dispute.openerId, dispute.respondentId].map((userId) => ({
+        userId,
+        tab: TABS.disputes,
+        type: 'dispute_verdict',
+        body: `The mediator returned a verdict on "${opportunity.title}". It moves nothing until you both accept it.`,
+        href: `/dashboard/disputes/${dispute.id}`,
+        agreementId: dispute.agreementId,
+      })),
+    )
 
     return NextResponse.json(updated)
   } catch (error) {

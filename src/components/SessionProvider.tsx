@@ -19,6 +19,10 @@ interface SessionValue {
   loading: boolean
   /** Re-read the session. Called after a role switch so every consumer follows. */
   refresh: () => Promise<void>
+  /** Unread count per nav href, for the badge next to each tab. */
+  unread: Record<string, number>
+  /** Opening a tab is the act of having seen what was waiting under it. */
+  markTabRead: (tab: string) => Promise<void>
 }
 
 const SessionContext = createContext<SessionValue | null>(null)
@@ -36,6 +40,7 @@ export default function SessionProvider({ children }: { children: React.ReactNod
   const router = useRouter()
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [unread, setUnread] = useState<Record<string, number>>({})
 
   const read = useCallback(
     async (redirectWhenRoleless: boolean) => {
@@ -67,6 +72,45 @@ export default function SessionProvider({ children }: { children: React.ReactNod
 
   const refresh = useCallback(() => read(false), [read])
 
+  const readNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications', { credentials: 'include' })
+      if (!res.ok) return
+      const { counts } = await res.json()
+      setUnread(counts ?? {})
+    } catch {
+      // A badge that fails to load is not worth surfacing to anyone.
+    }
+  }, [])
+
+  // Polled rather than pushed: the dashboard is a WebView on a phone that
+  // sleeps, and a missed socket would leave the badge permanently wrong.
+  useEffect(() => {
+    if (!user) return
+    readNotifications()
+    const timer = setInterval(readNotifications, 30_000)
+    return () => clearInterval(timer)
+  }, [user, readNotifications])
+
+  const markTabRead = useCallback(
+    async (tab: string) => {
+      // Clear it locally first; the badge should go the moment the page opens,
+      // not a round trip later.
+      setUnread((prev) => (prev[tab] ? { ...prev, [tab]: 0 } : prev))
+      try {
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ tab }),
+        })
+      } catch {
+        // It stays unread server-side and comes back on the next poll.
+      }
+    },
+    [],
+  )
+
   return (
     <SessionContext.Provider
       value={{
@@ -75,6 +119,8 @@ export default function SessionProvider({ children }: { children: React.ReactNod
         isPlatformMediator: Boolean(user?.isPlatformMediator),
         loading,
         refresh,
+        unread,
+        markTabRead,
       }}
     >
       {children}

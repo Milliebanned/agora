@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { notify, TABS } from '@/lib/notifications'
 import { recordCompletion } from '@/lib/reputation'
 
 // Approval is release. The client's approval reveals the pre-image, and the
@@ -56,6 +57,15 @@ export async function POST(
     ])
 
     await recordCompletion([opportunity.buyerId, opportunity.sellerId])
+
+    await notify({
+      userId: opportunity.sellerId,
+      tab: TABS.deals,
+      type: 'work_approved',
+      body: `Your work on "${opportunity.title}" was approved. The escrow is yours to claim.`,
+      href: `/dashboard/opportunities/${id}`,
+      agreementId: id,
+    })
 
     return NextResponse.json({
       opportunity: completed,

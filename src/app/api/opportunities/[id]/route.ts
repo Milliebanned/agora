@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { payFromEscrow, EscrowConfigError } from '@/lib/escrow-wallet'
+import { notify, TABS } from '@/lib/notifications'
+
+// Withdrawing a funded posting signs a real refund — @nimiq/core is
+// WebAssembly and needs the Node runtime, not edge.
+export const runtime = 'nodejs'
+export const maxDuration = 60
 import { isPlatformAdmin } from '@/lib/admin'
 import {
   isValidCategory,
@@ -128,7 +136,10 @@ export async function PATCH(
     const user = await requireSession(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const opportunity = await prisma.agreement.findUnique({ where: { id } })
+    const opportunity = await prisma.agreement.findUnique({
+      where: { id },
+      include: { buyer: { select: { address: true } } },
+    })
     if (!opportunity) {
       return NextResponse.json({ error: 'Opportunity not found' }, { status: 404 })
     }
@@ -145,15 +156,64 @@ export async function PATCH(
           { status: 400 },
         )
       }
+
+      // A draft never cost anything. A published posting did: the budget left
+      // the client's wallet at funding, so withdrawing has to send it back.
+      // Marking the row cancelled without returning the money would strand it
+      // in the escrow wallet with nothing left pointing at it.
+      const funded = await prisma.escrowTransaction.findFirst({
+        where: { agreementId: id, type: 'fund' },
+      })
+      const refundNIM = funded ? Number(opportunity.amountNIM) : 0
+
+      let refund: { amountNIM: number; txHash: string } | null = null
+      if (refundNIM > 0) {
+        const outcome = await refundWithdrawnBudget({
+          agreementId: id,
+          amountNIM: refundNIM,
+          clientAddress: opportunity.buyer.address,
+        })
+        // The posting stays exactly as it was if the money could not go back.
+        // A cancelled posting whose escrow is still held is strictly worse
+        // than a live one the client can try to withdraw again.
+        if (!outcome.ok) {
+          return NextResponse.json(
+            { error: outcome.error, detail: outcome.detail },
+            { status: outcome.status },
+          )
+        }
+        refund = { amountNIM: refundNIM, txHash: outcome.txHash }
+      }
+
       const cancelled = await prisma.agreement.update({
         where: { id },
         data: { status: 'cancelled' },
       })
-      await prisma.proposal.updateMany({
+      const { count: declined } = await prisma.proposal.updateMany({
         where: { agreementId: id, status: 'pending' },
         data: { status: 'rejected' },
       })
-      return NextResponse.json(cancelled)
+
+      // Anyone who wrote a proposal against this spent real effort on it and
+      // is owed the news directly, not a posting that quietly disappears.
+      const pitched = await prisma.proposal.findMany({
+        where: { agreementId: id, status: 'rejected' },
+        select: { freelancerId: true },
+      })
+      await Promise.all(
+        pitched.map((p) =>
+          notify({
+            userId: p.freelancerId,
+            tab: TABS.applications,
+            type: 'posting_withdrawn',
+            body: `"${opportunity.title}" was withdrawn by the client.`,
+            href: '/dashboard/applications',
+            agreementId: id,
+          }),
+        ),
+      )
+
+      return NextResponse.json({ ...cancelled, refund, declinedProposals: declined })
     }
 
     if (opportunity.status !== 'draft') {
@@ -190,5 +250,99 @@ export async function PATCH(
   } catch (error) {
     console.error('Update opportunity error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+
+// Sending a withdrawn posting's budget back to the client.
+//
+// Same shape as every other payout out of this wallet (claim/route.ts,
+// settlement.ts): reserve the row before signing so the unique constraint on
+// (agreementId, type) settles any race, respect the rolling ceiling, and never
+// retry a payout that might already have been broadcast.
+type WithdrawRefund =
+  | { ok: true; txHash: string }
+  | { ok: false; status: number; error: string; detail?: string }
+
+async function refundWithdrawnBudget({
+  agreementId,
+  amountNIM,
+  clientAddress,
+}: {
+  agreementId: string
+  amountNIM: number
+  clientAddress: string
+}): Promise<WithdrawRefund> {
+  const dailyLimitNIM = Number(process.env.ESCROW_DAILY_LIMIT_NIM ?? '0')
+  if (dailyLimitNIM > 0) {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const recent = await prisma.escrowTransaction.aggregate({
+      where: {
+        type: { in: ['claim', 'refund', 'excess_refund', 'withdraw_refund'] },
+        status: { in: ['confirmed', 'pending'] },
+        createdAt: { gte: since },
+      },
+      _sum: { amountNIM: true },
+    })
+    const paidToday = Number(recent._sum.amountNIM ?? 0)
+    if (paidToday + amountNIM > dailyLimitNIM) {
+      console.error(
+        `[escrow] DAILY LIMIT REACHED — refusing withdrawal refund of ${amountNIM} NIM for deal ${agreementId}.`,
+      )
+      return {
+        ok: false,
+        status: 429,
+        error:
+          'Payouts are temporarily paused for review. Your posting is untouched and nothing was lost — try withdrawing again later.',
+      }
+    }
+  }
+
+  let reservation
+  try {
+    reservation = await prisma.escrowTransaction.create({
+      data: { agreementId, type: 'withdraw_refund', status: 'pending', amountNIM },
+    })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return {
+        ok: false,
+        status: 409,
+        error: 'A refund for this posting is already in progress.',
+      }
+    }
+    throw err
+  }
+
+  try {
+    const payout = await payFromEscrow({ recipientAddress: clientAddress, amountNIM })
+    await prisma.escrowTransaction.update({
+      where: { id: reservation.id },
+      data: { status: 'confirmed', txHash: payout.txHash, confirmedAt: new Date() },
+    })
+    return { ok: true, txHash: payout.txHash }
+  } catch (err) {
+    // A configuration failure is raised before anything is signed, so the row
+    // goes away and the client can try again once an operator fixes it. Any
+    // other failure might have reached the network, so it stays for a human:
+    // reopening a payout that may have gone out is how somebody gets paid twice.
+    const isPreFlight = err instanceof EscrowConfigError
+    if (isPreFlight) {
+      await prisma.escrowTransaction.delete({ where: { id: reservation.id } })
+    } else {
+      await prisma.escrowTransaction.update({
+        where: { id: reservation.id },
+        data: { status: 'failed' },
+      })
+    }
+    console.error(`[escrow] withdrawal refund failed for deal ${agreementId}:`, err)
+    return {
+      ok: false,
+      status: 500,
+      error: isPreFlight
+        ? 'The escrow wallet is misconfigured, so the budget could not be returned. Your posting is untouched.'
+        : 'The refund could not be completed, so the posting was left as it is. An operator has been alerted.',
+      detail: err instanceof Error ? err.message : String(err),
+    }
   }
 }

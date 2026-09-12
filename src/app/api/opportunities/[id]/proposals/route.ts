@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { notify, TABS } from '@/lib/notifications'
 
 // Proposals are the only channel before a freelancer is selected. There is no
 // pre-selection chat on purpose: it keeps the record of who offered what clean
@@ -119,6 +120,15 @@ export async function POST(
       include: {
         freelancer: { select: { id: true, address: true, displayName: true } },
       },
+    })
+
+    await notify({
+      userId: opportunity.buyerId,
+      tab: TABS.deals,
+      type: 'proposal_received',
+      body: `${proposal.freelancer.displayName ?? 'A freelancer'} proposed ${bidNIM} NIM on "${opportunity.title}".`,
+      href: `/dashboard/opportunities/${id}`,
+      agreementId: id,
     })
 
     return NextResponse.json(proposal, { status: 201 })
