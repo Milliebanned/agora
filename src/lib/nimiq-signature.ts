@@ -36,23 +36,48 @@ function sha256(bytes: Uint8Array): Uint8Array {
 /**
  * The byte encodings a Nimiq wallet may have signed.
  *
- * Nimiq's signed-message convention wraps the text in a prefix and a length
+ * Nimiq's signed-message convention wraps the text in a prefix and its length
  * and signs the SHA-256 of that, which is what stops a message signed in one
- * app from being replayed as a transaction in another. The wallet applies the
- * wrapping on its own side and the mini-app SDK does not say which form it
- * used, so each plausible encoding is tried and any match is accepted.
+ * app from being replayed as a transaction in another.
  *
- * Accepting several does not weaken anything. The security comes from the
- * signature being valid for a key that derives to the claimed address, over a
- * nonce this server issued moments earlier and will not accept twice. Which
- * envelope the wallet wrapped that nonce in does not change any of that.
+ * The length is the message's length **in UTF-8 bytes**, not in JavaScript
+ * characters. Those are the same number for plain ASCII and different the
+ * moment anything else appears: a curly apostrophe is three bytes and one
+ * character, and a phone keyboard inserts one every time somebody types "Jane's
+ * logo". Using the character count verified every ASCII message and failed
+ * every other one, which is why signing in worked and accepting a verdict —
+ * whose text contained a typographic apostrophe — did not.
+ *
+ * The character-count spelling is kept as a later candidate rather than
+ * deleted: it costs one hash to try and covers a wallet that does it the other
+ * way. Accepting several encodings does not weaken anything, because the
+ * security comes from the signature being valid for a key that derives to the
+ * claimed address, over a nonce this server issued moments earlier and will
+ * not accept twice.
  */
-function candidateEncodings(message: string): Uint8Array[] {
+function candidateEncodings(message: string): { label: string; data: Uint8Array }[] {
   const utf8 = new TextEncoder().encode(message)
-  const prefixed = new TextEncoder().encode(
-    `\x16Nimiq Signed Message:\n${message.length}${message}`,
-  )
-  return [sha256(prefixed), prefixed, utf8, sha256(utf8)]
+  const prefix = new TextEncoder().encode('\x16Nimiq Signed Message:\n')
+
+  const wrap = (length: number) => {
+    const digits = new TextEncoder().encode(String(length))
+    const out = new Uint8Array(prefix.length + digits.length + utf8.length)
+    out.set(prefix, 0)
+    out.set(digits, prefix.length)
+    out.set(utf8, prefix.length + digits.length)
+    return out
+  }
+
+  const byByteLength = wrap(utf8.length)
+  const byCharLength = wrap(message.length)
+
+  return [
+    { label: 'sha256(prefix+byteLength+utf8)', data: sha256(byByteLength) },
+    { label: 'sha256(prefix+charLength+utf8)', data: sha256(byCharLength) },
+    { label: 'prefix+byteLength+utf8', data: byByteLength },
+    { label: 'utf8', data: utf8 },
+    { label: 'sha256(utf8)', data: sha256(utf8) },
+  ]
 }
 
 export interface SignatureCheck {
@@ -98,9 +123,14 @@ export async function verifyNimiqSignature({
     return { ok: false, reason: 'That signature was made by a different wallet.' }
   }
 
-  for (const data of candidateEncodings(message)) {
+  for (const candidate of candidateEncodings(message)) {
     try {
-      if (key.verify(sig, data)) return { ok: true }
+      if (key.verify(sig, candidate.data)) {
+        // Logged so the encoding a real wallet actually uses is on the record
+        // rather than inferred, the next time one of these goes wrong.
+        console.info(`[signature] verified via ${candidate.label}`)
+        return { ok: true }
+      }
     } catch {
       // A malformed candidate is not a failure of the others.
     }

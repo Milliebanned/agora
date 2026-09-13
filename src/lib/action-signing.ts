@@ -23,7 +23,7 @@ export const SIGNED_ACTIONS = {
   approve_work: 'Approve the work and release the escrow for',
   accept_proposal: 'Accept this proposal and lock the escrow for',
   withdraw_posting: 'Withdraw and refund the escrow for',
-  settle_dispute: 'Accept the mediator’s verdict for',
+  settle_dispute: "Accept the mediator's verdict for",
   // Commitments: things that put you on the hook to another person.
   submit_proposal: 'Submit a proposal for',
   submit_work: 'Submit the finished work for',
