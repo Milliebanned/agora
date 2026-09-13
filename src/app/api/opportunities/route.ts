@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import {
   BUDGET_BANDS,
   TIMELINE_BANDS,
@@ -107,6 +108,17 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
+
+    // Putting work up in your own name is signed, so a posting on the board
+    // is always something a wallet actually agreed to publish.
+    const signedPost = await consumeSignedAction({
+      proof: body,
+      address: user.address,
+      action: 'post_job',
+    })
+    if (!signedPost.ok) {
+      return NextResponse.json({ error: signedPost.error }, { status: signedPost.status })
+    }
     const title = String(body.title ?? '').trim()
     const description = String(body.description ?? '').trim()
     const category = body.category

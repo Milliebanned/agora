@@ -10,6 +10,7 @@ import { ESCROW_STAGE_COPY, escrowStage } from '@/lib/opportunities'
 import { formatDate, shortAddress } from '@/lib/utils'
 import { sendBasicTransaction } from '@/lib/nimiq'
 import type { OpportunityDetail } from './types'
+import { useSignedAction } from '@/hooks/useSignedAction'
 
 // The escrow panel says exactly where the money is, and never claims the chain
 // has done something it has not been told the chain did.
@@ -143,14 +144,20 @@ export default function EscrowPanel({
 
   // The client approved, so the money is the freelancer's to take. The payout
   // is signed by the escrow wallet server-side; this only asks for it.
+  const { sign } = useSignedAction()
+
   const claim = async () => {
     setBusy('claim')
     onError('')
     try {
+      // Taking the money is the one action most worth proving was you, so the
+      // wallet signs a line naming this deal and the amount before it moves.
+      const proof = await sign('claim_escrow', opportunity.id)
+      if (!proof) return
       const result = await json(`/api/opportunities/${opportunity.id}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(proof),
       })
       onNotice(result.message)
       await onChanged()

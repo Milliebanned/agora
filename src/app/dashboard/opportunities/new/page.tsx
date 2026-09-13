@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Input, Select, Textarea } from '@/components/ui/input'
 import { PageHeader, Spinner } from '@/components/ui/page'
 import { CATEGORIES, MAX_DELIVERABLES } from '@/lib/opportunities'
+import { useSignedAction } from '@/hooks/useSignedAction'
 
 const CUSTOM = '__custom__'
 
@@ -88,16 +89,26 @@ export default function NewOpportunityPage() {
   const setDeliverable = (i: number, value: string) =>
     setDeliverables((prev) => prev.map((d, idx) => (idx === i ? value : d)))
 
+  const { sign } = useSignedAction()
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError('')
     try {
+      // Putting work up under your own name is signed, so every posting on
+      // the board is one a wallet agreed to publish.
+      const proof = await sign('post_job')
+      if (!proof) {
+        setSaving(false)
+        return
+      }
       const res = await fetch('/api/opportunities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          ...proof,
           title,
           category,
           serviceType,

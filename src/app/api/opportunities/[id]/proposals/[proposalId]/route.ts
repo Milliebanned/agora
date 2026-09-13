@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { recordEngagement } from '@/lib/reputation'
 import { payFromEscrow, EscrowConfigError } from '@/lib/escrow-wallet'
 import { checkSignedPayment } from '@/lib/escrow-verify'
@@ -32,7 +33,24 @@ export async function PATCH(
     const user = await requireSession(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { action, currentBlock, serialized, txHash: reportedHash } = await request.json()
+    const body = await request.json()
+    const { action, currentBlock, serialized, txHash: reportedHash } = body
+
+    // Accepting is the moment the escrow is committed to one person, so the
+    // client's wallet signs it. Rejecting and withdrawing move nothing and
+    // stay unsigned: asking for a signature on everything teaches people to
+    // tap through the ones that matter.
+    if (action === 'accept') {
+      const signedAccept = await consumeSignedAction({
+        proof: body,
+        address: user.address,
+        action: 'accept_proposal',
+        subjectId: id,
+      })
+      if (!signedAccept.ok) {
+        return NextResponse.json({ error: signedAccept.error }, { status: signedAccept.status })
+      }
+    }
 
     const proposal = await prisma.proposal.findUnique({
       where: { id: proposalId },

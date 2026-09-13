@@ -61,14 +61,7 @@ export function getSessionFromRequest(request: Request): string | null {
 }
 
 // Verify wallet signature (assuming externally signed message from Nimiq Pay)
-export function verifyWalletSignature(
-  address: string,
-  message: string,
-  signature: string,
-): boolean {
-  // TODO: Verify Nimiq signature
-  // This requires integration with Nimiq's signature verification
-  // For MVP, trust the SDK's built-in verification (it hands back only verified signatures)
-  console.warn('verifyWalletSignature: implement Nimiq signature verification')
-  return true
-}
+// Signature checking moved to src/lib/nimiq-signature.ts, which does it for
+// real. The function that used to live here took an address, a message and a
+// signature, looked at none of them, and returned true, which meant every
+// wallet in the app was whoever it said it was.

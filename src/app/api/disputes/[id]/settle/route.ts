@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { settleEscrow } from '@/lib/settlement'
 import { recordCompletion } from '@/lib/reputation'
 
@@ -55,6 +56,21 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}) as { decision?: string })
     const decision = (body as { decision?: string }).decision === 'reject' ? 'rejected' : 'accepted'
+
+    // Accepting a verdict is what splits the escrow, and it is the record a
+    // mediator's decision rests on afterwards, so it is signed. Rejecting is
+    // not: refusing a verdict moves nothing and should never be discouraged.
+    if (decision === 'accepted') {
+      const signedSettle = await consumeSignedAction({
+        proof: body,
+        address: user.address,
+        action: 'settle_dispute',
+        subjectId: dispute.agreementId,
+      })
+      if (!signedSettle.ok) {
+        return NextResponse.json({ error: signedSettle.error }, { status: signedSettle.status })
+      }
+    }
 
     if (dispute.status === 'resolved') {
       return NextResponse.json({ error: 'This dispute is already settled.' }, { status: 409 })

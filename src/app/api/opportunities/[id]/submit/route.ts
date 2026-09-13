@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { notify, TABS } from '@/lib/notifications'
 import { parseAttachments, sanitizeAttachments } from '@/lib/opportunities'
 
@@ -38,6 +39,17 @@ export async function POST(
 
     const body = await request.json()
     const summary = String(body.summary ?? '').trim()
+
+    // Handing in work is a commitment to the other side, so it is signed.
+    const signedSubmit = await consumeSignedAction({
+      proof: body,
+      address: user.address,
+      action: 'submit_work',
+      subjectId: id,
+    })
+    if (!signedSubmit.ok) {
+      return NextResponse.json({ error: signedSubmit.error }, { status: signedSubmit.status })
+    }
     if (summary.length < 20) {
       return NextResponse.json(
         { error: 'Describe what you delivered (20+ characters)' },

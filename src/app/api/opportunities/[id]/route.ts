@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { payFromEscrow, EscrowConfigError } from '@/lib/escrow-wallet'
 import { notify, TABS } from '@/lib/notifications'
 import { getTransactionByHash, sameAddress } from '@/lib/nimiq-rpc'
@@ -164,6 +165,21 @@ export async function PATCH(
         return NextResponse.json(
           { error: 'A posting cannot be withdrawn once a freelancer is engaged' },
           { status: 400 },
+        )
+      }
+
+      // Withdrawing sends the escrow back, so the wallet receiving it signs
+      // for it. Ordinary edits to a draft are not signed: nothing moves.
+      const signedWithdraw = await consumeSignedAction({
+        proof: body,
+        address: user.address,
+        action: 'withdraw_posting',
+        subjectId: id,
+      })
+      if (!signedWithdraw.ok) {
+        return NextResponse.json(
+          { error: signedWithdraw.error },
+          { status: signedWithdraw.status },
         )
       }
 

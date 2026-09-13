@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { notify, TABS } from '@/lib/notifications'
 import { recordCompletion } from '@/lib/reputation'
 
@@ -15,6 +16,16 @@ export async function POST(
     const { id } = await params
     const user = await requireSession(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Approving is what releases somebody else's payment, so it is signed.
+    const body = await request.json().catch(() => ({}))
+    const signed = await consumeSignedAction({
+      proof: body,
+      address: user.address,
+      action: 'approve_work',
+      subjectId: id,
+    })
+    if (!signed.ok) return NextResponse.json({ error: signed.error }, { status: signed.status })
 
     const opportunity = await prisma.agreement.findUnique({
       where: { id },

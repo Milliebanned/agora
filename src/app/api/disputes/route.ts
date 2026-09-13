@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { notify, TABS } from '@/lib/notifications'
 import { recordDispute } from '@/lib/reputation'
 import { isPlatformAdmin } from '@/lib/admin'
@@ -53,7 +54,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { agreementId, reason } = await request.json()
+    // One read: a request body is a stream and cannot be parsed twice.
+    const disputeBody = await request.json().catch(() => ({}))
+    const { agreementId, reason } = disputeBody
+
+    // Opening a dispute is an accusation that freezes somebody's money, so it
+    // carries a signature from the wallet making it.
+    const signedDispute = await consumeSignedAction({
+      proof: disputeBody,
+      address: user.address,
+      action: 'open_dispute',
+      subjectId: agreementId,
+    })
+    if (!signedDispute.ok) {
+      return NextResponse.json({ error: signedDispute.error }, { status: signedDispute.status })
+    }
 
     if (!agreementId || !reason) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })

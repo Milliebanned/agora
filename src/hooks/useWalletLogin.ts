@@ -33,7 +33,7 @@ export function useWalletLogin() {
         body: JSON.stringify({ address }),
       })
 
-      const { challenge } = await challengeRes.json()
+      const { challenge, nonce } = await challengeRes.json()
 
       const signed = await signMessage(challenge)
       if (!signed) {
@@ -58,7 +58,9 @@ export function useWalletLogin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address,
-          message: challenge,
+          // The nonce, not the text: the server verifies against the copy it
+          // stored, so a client cannot present a signature of its own sentence.
+          nonce,
           signature: signed.signature,
           publicKey: signed.publicKey,
         }),

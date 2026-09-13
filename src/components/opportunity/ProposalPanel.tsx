@@ -12,6 +12,7 @@ import { getBlockNumber, sendBasicTransaction } from "@/lib/nimiq";
 import { MESSAGES } from "@/lib/messages";
 import Avatar from "@/components/ui/avatar";
 import type { OpportunityDetail, ProposalRow } from "./types";
+import { useSignedAction } from '@/hooks/useSignedAction'
 
 // Two views of the same table. The client is choosing; the freelancer is
 // pitching. Neither sees the other's side of it: rival bids stay private, and a
@@ -75,8 +76,13 @@ function ClientView({
   onError: (message: string) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const { sign } = useSignedAction();
   const open = opportunity.status === "open";
   const funded = Number(opportunity.amountNIM);
+
+  // Thrown when the wallet dialog is dismissed. Caught and swallowed below:
+  // changing your mind is an answer, not a failure to report.
+  const DECLINED = "__declined__";
 
   const decide = async (proposal: ProposalRow, action: "accept" | "reject") => {
     setBusy(proposal.id);
@@ -89,13 +95,26 @@ function ClientView({
         action === "accept" ? await getBlockNumber() : undefined;
 
       const attempt = async (serialized?: string, txHash?: string) => {
+        // A fresh signature per attempt: a nonce is spent the moment the
+        // server accepts it, so the retry after a top-up needs its own.
+        // Rejecting a proposal moves no money and is not signed.
+        const proof =
+          action === "accept" ? await sign("accept_proposal", opportunity.id) : null;
+        if (action === "accept" && !proof) throw new Error(DECLINED);
+
         const res = await fetch(
           `/api/opportunities/${opportunity.id}/proposals/${proposal.id}`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ action, currentBlock, serialized, txHash }),
+            body: JSON.stringify({
+              action,
+              currentBlock,
+              serialized,
+              txHash,
+              ...(proof ?? {}),
+            }),
           },
         );
         return { res, body: await res.json().catch(() => null) };
@@ -169,6 +188,7 @@ function ClientView({
       }
       await onChanged();
     } catch (err) {
+      if (err instanceof Error && err.message === DECLINED) return;
       onError(
         err instanceof Error ? err.message : "Could not update the proposal",
       );
@@ -328,12 +348,16 @@ function FreelancerView({
   );
   const [editing, setEditing] = useState(!existing);
   const [saving, setSaving] = useState(false);
+  const { sign } = useSignedAction();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     onError("");
     try {
+      // An offer somebody can accept, so the wallet puts its name to it.
+      const proof = await sign("submit_proposal", opportunity.id);
+      if (!proof) return;
       const res = await fetch(
         `/api/opportunities/${opportunity.id}/proposals`,
         {
@@ -345,6 +369,7 @@ function FreelancerView({
             portfolioUrl,
             bidNIM: Number(bid),
             deliveryDays: Number(days),
+            ...proof,
           }),
         },
       );

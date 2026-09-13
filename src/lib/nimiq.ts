@@ -47,14 +47,37 @@ function mockAddress(): string {
   }
 }
 
+// The development wallet signs for real.
+//
+// It used to hand back sixty-four zeroes, which was fine while the server
+// checked nothing and useless the moment it did. Rather than teach the server
+// to wave the mock through — a hole that would then exist in production — the
+// mock gets a genuine signature from a throwaway key and the server treats it
+// exactly like any other wallet.
+//
+// The signing happens on the server because @nimiq/core is WebAssembly and
+// pulling it into the browser bundle breaks the build. The route that does it
+// refuses to exist outside development.
 function mockNimiqProvider() {
-  const address = mockAddress()
+  const seedName = mockAddress()
+
+  const devSign = async (message: string) => {
+    const res = await fetch('/api/dev/mock-wallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seed: seedName, message }),
+    })
+    if (!res.ok) throw new Error('The development wallet is only available in development.')
+    return res.json() as Promise<{ address: string; publicKey: string; signature: string }>
+  }
+
   return {
-    listAccounts: async () => [address],
-    sign: async (_message: string | { message: string; isHex?: boolean }) => ({
-      publicKey: '0x' + '0'.repeat(64),
-      signature: '0x' + '0'.repeat(128),
-    }),
+    listAccounts: async () => [(await devSign('address lookup')).address],
+    sign: async (message: string | { message: string; isHex?: boolean }) => {
+      const text = typeof message === 'string' ? message : message.message
+      const { publicKey, signature } = await devSign(text)
+      return { publicKey, signature }
+    },
     isConsensusEstablished: async () => true,
     getBlockNumber: async () => 1,
     // No NIM moves. The server must be told to skip on-chain verification

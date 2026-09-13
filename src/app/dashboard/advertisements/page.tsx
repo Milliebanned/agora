@@ -13,6 +13,7 @@ import { useSession } from '@/components/SessionProvider'
 import { CATEGORIES, categoryLabel } from '@/lib/opportunities'
 import { MESSAGES, FALLBACK_ERROR } from '@/lib/messages'
 import { cn } from '@/lib/utils'
+import { useSignedAction } from '@/hooks/useSignedAction'
 
 interface Listing {
   id: string
@@ -94,15 +95,23 @@ export default function AdvertisementsPage() {
     setCustomService('')
   }
 
+  const { sign } = useSignedAction()
+
   const publish = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy('create')
     try {
+      const proof = await sign('publish_ad')
+      if (!proof) {
+        setBusy(null)
+        return
+      }
       const res = await fetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          ...proof,
           title,
           description,
           category,

@@ -1,19 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { signSessionToken, verifyWalletSignature } from '@/lib/auth'
+import { signSessionToken } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
+
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    const { address, message, signature } = await request.json()
+    const { address, nonce, signature, publicKey } = await request.json()
 
-    if (!address || !message || !signature) {
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    if (!address || !nonce || !signature || !publicKey) {
+      return NextResponse.json(
+        { error: 'Address, nonce, signature and public key are all required.' },
+        { status: 400 },
+      )
     }
 
-    // Verify the signature
-    const isValid = verifyWalletSignature(address, message, signature)
-    if (!isValid) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    // The real check. The nonce has to be one this server issued to this
+    // address moments ago and has never spent, and the signature over it has
+    // to come from a key that derives to that same address.
+    const proven = await consumeSignedAction({
+      proof: { nonce, signature, publicKey },
+      address,
+      action: 'login',
+    })
+    if (!proven.ok) {
+      return NextResponse.json({ error: proven.error }, { status: proven.status })
     }
 
     // Find or create user

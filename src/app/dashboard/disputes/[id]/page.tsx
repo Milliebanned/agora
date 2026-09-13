@@ -22,6 +22,7 @@ import { PageLoading, Spinner } from '@/components/ui/page'
 import { useToast } from '@/components/ui/toast'
 import { useSession } from '@/components/SessionProvider'
 import { FALLBACK_ERROR } from '@/lib/messages'
+import { useSignedAction } from '@/hooks/useSignedAction'
 
 interface Dispute {
   id: string
@@ -109,14 +110,26 @@ export default function DisputeDetailPage() {
     }
   }
 
+  const { sign } = useSignedAction()
+
   const handleDecision = async (decision: 'accept' | 'reject') => {
     setAccepting(decision)
     try {
+      // Accepting a verdict splits the escrow, so it is signed. Rejecting one
+      // moves nothing and is not: refusing should never be the harder path.
+      let proof = null
+      if (decision === 'accept') {
+        proof = await sign('settle_dispute', dispute?.agreement.id)
+        if (!proof) {
+          setAccepting(null)
+          return
+        }
+      }
       const res = await fetch(`/api/disputes/${disputeId}/settle`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify({ decision, ...(proof ?? {}) }),
       })
       const data = await res.json()
 

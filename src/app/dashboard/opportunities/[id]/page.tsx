@@ -27,6 +27,7 @@ import type { OpportunityDetail } from '@/components/opportunity/types'
 import { categoryLabel, isEngaged, parseAttachments, splitAttachments } from '@/lib/opportunities'
 import { formatDate, parseJsonArray, shortAddress } from '@/lib/utils'
 import { FALLBACK_ERROR } from '@/lib/messages'
+import { useSignedAction } from '@/hooks/useSignedAction'
 
 // One page for the whole life of an opportunity. What it shows is decided by
 // who is reading and how far along the deal is: a stranger sees the brief and a
@@ -96,14 +97,22 @@ export default function OpportunityDetailPage() {
   const deliverables = parseJsonArray(opportunity.deliverables)
   const { brief: attachments } = splitAttachments(parseAttachments(opportunity.attachments))
   const budget = Number(opportunity.budgetNIM ?? opportunity.amountNIM)
+  const { sign } = useSignedAction()
+
   const withdraw = async () => {
     setWithdrawing(true)
     try {
+      // The refund goes back to this wallet, so this wallet asks for it.
+      const proof = await sign('withdraw_posting', id)
+      if (!proof) {
+        setWithdrawing(false)
+        return
+      }
       const res = await fetch(`/api/opportunities/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: 'cancelled' }),
+        body: JSON.stringify({ status: 'cancelled', ...proof }),
       })
       const body = await res.json().catch(() => null)
       if (!res.ok) {

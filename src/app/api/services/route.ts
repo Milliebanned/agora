@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { isValidCategory } from '@/lib/opportunities'
 
 // Freelancer advertisements. This is the other side of /api/opportunities: a
@@ -91,6 +92,16 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
+
+    // The same for an advertisement: it carries a name, a price and a promise.
+    const signedAd = await consumeSignedAction({
+      proof: body,
+      address: user.address,
+      action: 'publish_ad',
+    })
+    if (!signedAd.ok) {
+      return NextResponse.json({ error: signedAd.error }, { status: signedAd.status })
+    }
     const title = String(body.title ?? '').trim()
     const description = String(body.description ?? '').trim()
     const category = body.category

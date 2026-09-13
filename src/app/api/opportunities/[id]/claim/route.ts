@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { payFromEscrow, EscrowConfigError } from '@/lib/escrow-wallet'
 import { getTransactionsByAddress, sameAddress } from '@/lib/nimiq-rpc'
 
@@ -31,6 +32,17 @@ export async function POST(
     const { id } = await params
     const user = await requireSession(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Guard 0 — the wallet itself authorised this, not just a cookie. The
+    // text they signed names this deal and the amount leaving escrow.
+    const body = await request.json().catch(() => ({}))
+    const signed = await consumeSignedAction({
+      proof: body,
+      address: user.address,
+      action: 'claim_escrow',
+      subjectId: id,
+    })
+    if (!signed.ok) return NextResponse.json({ error: signed.error }, { status: signed.status })
 
     const opportunity = await prisma.agreement.findUnique({
       where: { id },

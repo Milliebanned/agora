@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { consumeSignedAction } from '@/lib/action-signing'
 import { notify, TABS } from '@/lib/notifications'
 
 // Proposals are the only channel before a freelancer is selected. There is no
@@ -89,6 +90,17 @@ export async function POST(
 
     const body = await request.json()
     const coverLetter = String(body.coverLetter ?? '').trim()
+
+    // A proposal is an offer somebody can accept, so the wallet signs it.
+    const signedProposal = await consumeSignedAction({
+      proof: body,
+      address: user.address,
+      action: 'submit_proposal',
+      subjectId: id,
+    })
+    if (!signedProposal.ok) {
+      return NextResponse.json({ error: signedProposal.error }, { status: signedProposal.status })
+    }
     const portfolioRaw = String(body.portfolioUrl ?? '').trim()
     const bidNIM = Number(body.bidNIM)
     const deliveryDays = Number(body.deliveryDays)

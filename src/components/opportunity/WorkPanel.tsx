@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/page'
 import { formatDate, parseJsonArray } from '@/lib/utils'
 import { parseAttachments, splitAttachments } from '@/lib/opportunities'
 import { MESSAGES } from '@/lib/messages'
+import { useSignedAction } from '@/hooks/useSignedAction'
 import type { OpportunityDetail } from './types'
 
 // Delivery and judgement in one place: the freelancer hands work in, the client
@@ -38,6 +39,8 @@ export default function WorkPanel({
   const deliverables = parseJsonArray(opportunity.deliverables)
   const openDispute = opportunity.disputes.find((d) => d.status !== 'resolved')
 
+  const { sign } = useSignedAction()
+
   const post = async (url: string, body: unknown) => {
     const res = await fetch(url, {
       method: 'POST',
@@ -55,9 +58,14 @@ export default function WorkPanel({
     setBusy('submit')
     onError('')
     try {
+      // The wallet signs off on handing the work in, and the proof travels
+      // with the request. A declined dialog just stops, quietly.
+      const proof = await sign('submit_work', opportunity.id)
+      if (!proof) return
       await post(`/api/opportunities/${opportunity.id}/submit`, {
         summary,
         attachments: links.filter((l) => l.url.trim()),
+        ...proof,
       })
       onNotice(MESSAGES.workSubmitted)
       setResubmitting(false)
@@ -74,7 +82,9 @@ export default function WorkPanel({
     setBusy('approve')
     onError('')
     try {
-      const result = await post(`/api/opportunities/${opportunity.id}/approve`, {})
+      const proof = await sign('approve_work', opportunity.id)
+      if (!proof) return
+      const result = await post(`/api/opportunities/${opportunity.id}/approve`, proof)
       onNotice(result.message ?? MESSAGES.workApproved)
       await onChanged()
     } catch (err) {
@@ -92,7 +102,18 @@ export default function WorkPanel({
     setBusy('dispute')
     onError('')
     try {
-      const dispute = await post('/api/disputes', { agreementId: opportunity.id, reason })
+      const proof = await sign('open_dispute', opportunity.id)
+      // Declining the wallet dialog is a decision, not a failure: put the
+      // button back rather than leaving it spinning on a dispute nobody opened.
+      if (!proof) {
+        setBusy(null)
+        return
+      }
+      const dispute = await post('/api/disputes', {
+        agreementId: opportunity.id,
+        reason,
+        ...proof,
+      })
       onNotice(MESSAGES.disputeOpened)
       setShowDispute(false)
       window.location.href = `/dashboard/disputes/${dispute.id}`

@@ -358,3 +358,30 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, tab, readAt])
 }
+
+// A one-time challenge the wallet has to sign before something happens.
+//
+// This is what makes a signature mean anything. Without a stored nonce, a
+// signature is just a string somebody can send twice: the server has no way to
+// tell a fresh approval from a replayed one, and no way to tell which action it
+// was for. Every row here is issued for one person, one action and one subject,
+// is valid for a few minutes, and is burned the moment it is spent.
+model SignatureChallenge {
+  id        String   @id @default(cuid())
+  nonce     String   @unique
+  /// The wallet the challenge was issued to, normalised without spaces.
+  address   String
+  /// What it authorises: "login", "claim_escrow", "accept_proposal", and so on.
+  action    String
+  /// The agreement, proposal or listing it concerns, when it concerns one.
+  subjectId String?
+  /// The exact text the wallet is asked to sign, kept so the server verifies
+  /// against what was actually shown to the person rather than rebuilding it.
+  message   String
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  @@index([address, action])
+  @@index([expiresAt])
+}
