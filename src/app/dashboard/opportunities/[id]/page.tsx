@@ -70,6 +70,10 @@ export default function OpportunityDetailPage() {
     load().finally(() => setLoading(false))
   }, [load])
 
+  // Above the early returns below: hooks have to run in the same order on
+  // every render, and this component returns early while it is loading.
+  const { sign } = useSignedAction()
+
   // Arriving straight from the posting form, where the next step is funding.
   // Read from location rather than useSearchParams so the page needs no
   // Suspense boundary for a hint this small.
@@ -97,8 +101,6 @@ export default function OpportunityDetailPage() {
   const deliverables = parseJsonArray(opportunity.deliverables)
   const { brief: attachments } = splitAttachments(parseAttachments(opportunity.attachments))
   const budget = Number(opportunity.budgetNIM ?? opportunity.amountNIM)
-  const { sign } = useSignedAction()
-
   const withdraw = async () => {
     setWithdrawing(true)
     try {
