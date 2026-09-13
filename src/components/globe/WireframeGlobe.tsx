@@ -18,8 +18,6 @@ export interface WireframeGlobeProps {
   autoRotateSpeed?: number
 }
 
-const cssVar = (name: string, fallback: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
 
 function buildGridGroup(radius: number): THREE.Group {
   const group = new THREE.Group()
@@ -106,10 +104,18 @@ function buildArc(
 }
 
 function buildScene(radius: number): THREE.Group {
+  // The globe's own palette, written out rather than read from the theme.
+  //
+  // These are decorative colours for one scene on a page that has no light
+  // theme, not brand tokens, and reading them from CSS made them hostage to
+  // any change in the stylesheet: when --accent moved to the brand green the
+  // yellow here went with it, and when the tokens were rewritten as
+  // "rgb(59 177 67)" three.js could not parse the space-separated form at all
+  // and fell back to white, taking the cyan and violet with it.
   const colors: Record<NodeColor, string> = {
-    accent: cssVar('--accent', '#e4f222'),
-    info: cssVar('--info', '#02b8cc'),
-    violet: cssVar('--violet', '#6366f1'),
+    accent: '#e4f222',
+    info: '#02b8cc',
+    violet: '#6366f1',
   }
 
   const nodePositions: Record<string, [number, number, number]> = {}
