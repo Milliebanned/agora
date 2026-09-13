@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getAccounts, signMessage } from '@/lib/nimiq'
+import { detectNimiqPay, openInNimiqPay } from '@/lib/nimiq-pay-link'
 
 export function useWalletLogin() {
   const router = useRouter()
@@ -18,8 +19,26 @@ export function useWalletLogin() {
     setWalletMissing(false)
 
     try {
+      // Settled before asking the SDK, which waits ten seconds for a provider
+      // before conceding there is none. Outside the app that is ten seconds of
+      // nothing happening, and the answer is already known by then.
+      if (!(await detectNimiqPay())) {
+        // On a phone, hand the visitor to the app. Anywhere else, or if that
+        // was already tried, say plainly what is needed.
+        if (openInNimiqPay()) return
+        setWalletMissing(true)
+        setLoading(false)
+        return
+      }
+
       const accounts = await getAccounts()
       if (!accounts || accounts.length === 0) {
+        // No provider, so this is a browser rather than the app. On a phone,
+        // ask the operating system to reopen this site inside Nimiq Pay: if it
+        // is installed it takes over from here and the wallet is simply there.
+        // If that was already tried, or this is a desktop, fall through to the
+        // instructions instead of bouncing somebody out to a dead end twice.
+        if (openInNimiqPay()) return
         setWalletMissing(true)
         setLoading(false)
         return

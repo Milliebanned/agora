@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/page'
 import { useWalletLogin } from '@/hooks/useWalletLogin'
+import { isPhone, nimiqPayLinkFor } from '@/lib/nimiq-pay-link'
 import ThinkerScene from '@/components/decor/ThinkerScene'
 import PopularServices from '@/components/landing/PopularServices'
 
@@ -87,6 +88,12 @@ const STEPS = [
 
 export default function Home() {
   const { connectWallet, loading, error, walletMissing } = useWalletLogin()
+  // Only offered on a phone, and only once mounted: a universal link cannot
+  // open a phone app from a desktop, and the host is not known on the server.
+  const [payLink, setPayLink] = useState('')
+  useEffect(() => {
+    if (isPhone()) setPayLink(nimiqPayLinkFor(window.location.host))
+  }, [])
   const [signedIn, setSignedIn] = useState(false)
   // A returning wallet that never picked a side resumes at /onboarding.
   const [resumeHref, setResumeHref] = useState('/dashboard')
@@ -227,12 +234,24 @@ export default function Home() {
                     free, takes a minute to set up, and is the only thing you need to start.
                   </p>
                   <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                    {/* Already have it? One tap reopens this page inside the
+                        app. Shown first, because somebody who reached this card
+                        on a phone most likely has the app and was simply in the
+                        wrong browser. */}
+                    {payLink && (
+                      <a href={payLink}>
+                        <Button size="sm">
+                          Open in Nimiq Pay
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </a>
+                    )}
                     <a
                       href="https://nimiq.com/nimiq-pay"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <Button size="sm">
+                      <Button size="sm" variant={payLink ? 'secondary' : 'primary'}>
                         Get Nimiq Pay
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Button>
