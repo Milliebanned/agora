@@ -53,6 +53,27 @@ const FEATURES = [
   },
 ]
 
+const X_URL = 'https://x.com/agoraonnim'
+const GITHUB_URL = 'https://github.com/Milliebanned/agora'
+
+// X's mark, drawn rather than pulled from an icon set: lucide has no brand
+// glyphs, and this is the one place the product borrows somebody else's logo.
+function XMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className={className}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
+function GitHubMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className={className}>
+      <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z" />
+    </svg>
+  )
+}
+
 // Outlined by default, and the outline only takes the brand colour on hover.
 const NAV_LINK =
   'group flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-1.5 py-1.5 font-mono text-[11.5px] tracking-[0.04em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground disabled:opacity-50 sm:px-2.5 sm:text-[12px] sm:tracking-[0.06em]'
@@ -119,6 +140,16 @@ export default function Home() {
             >
               <span className="text-subtle-foreground transition-colors group-hover:text-[#3bb143]">//</span>
               Read docs
+            </a>
+            <a
+              href={X_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Agora on X"
+              className={NAV_LINK}
+            >
+              <XMark className="h-3 w-3" />
+              <span className="hidden sm:inline">@agoraonnim</span>
             </a>
           </nav>
 
@@ -342,9 +373,29 @@ export default function Home() {
       </section>
 
       <footer>
-        <div className="mx-auto flex max-w-content flex-col gap-2 px-6 py-10 text-[13px] text-subtle-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-content flex-col gap-4 px-6 py-10 text-[13px] text-subtle-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>Agora, the AI-powered trust layer for P2P commerce on Nimiq</span>
-          <span className="font-mono">Nimiq Mini Apps</span>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 transition-colors hover:text-foreground"
+            >
+              <GitHubMark className="h-4 w-4" />
+              GitHub
+            </a>
+            <a
+              href={X_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 transition-colors hover:text-foreground"
+            >
+              <XMark className="h-3.5 w-3.5" />
+              @agoraonnim
+            </a>
+            <span className="font-mono">Nimiq Mini Apps</span>
+          </div>
         </div>
       </footer>
     </div>
