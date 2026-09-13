@@ -95,13 +95,13 @@ export default function DealsPage() {
         }
       />
 
-      <div className="mb-5 flex flex-wrap gap-1.5">
+      <div className="-mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0">
         {FILTERS.map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
             className={cn(
-              'h-7 rounded-full px-3 text-[13px] transition-colors',
+              'h-7 shrink-0 rounded-full px-3 text-[13px] transition-colors',
               filter === status
                 ? 'bg-elevate-strong text-foreground'
                 : 'bg-elevate text-muted-foreground hover:bg-elevate-strong hover:text-secondary-foreground',
