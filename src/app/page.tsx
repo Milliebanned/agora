@@ -39,8 +39,13 @@ const FEATURES = [
   },
   {
     icon: ShieldCheck,
-    title: 'HTLC-backed escrow',
-    body: "Funds lock in a Nimiq hashed timelock contract, not a company account. Approval lets the freelancer claim it; past the timeout, the client can claim a refund.",
+    title: 'Escrow you can check on-chain',
+    // Describes what the code does. It said funds lock in a hashed timelock
+    // contract "not a company account", and the opposite is true: the budget
+    // is held in an account Agora controls, no HTLC is ever created, and every
+    // payout is signed server-side. Saying otherwise on the one claim that is
+    // about where somebody's money sits is the worst place to be wrong.
+    body: 'The budget is paid into Agora\u2019s Nimiq escrow account before the job is visible, and every movement in or out of it is a real transaction on Nimiq mainnet with a hash you can look up. It leaves only when you approve the work, when you withdraw the posting, or when both sides accept a verdict.',
   },
   {
     icon: Star,
@@ -82,7 +87,7 @@ const NAV_LINK =
 const STEPS = [
   ['Connect', 'Sign in with your Nimiq Pay wallet. No password, no signup form.'],
   ['Post', 'Fill in the brief and commit the budget. Only funded work reaches the board.'],
-  ['Select', 'Freelancers propose. Accepting one creates the HTLC and opens a private chat.'],
+  ['Select', 'Freelancers propose. Accepting one locks the budget to them and opens a private chat.'],
   ['Settle', 'Approve to release the escrow, or open a dispute for AI mediation.'],
 ]
 

@@ -270,8 +270,8 @@ export default function WorkPanel({
         {isClient && opportunity.status === 'submitted' && (
           <div className="space-y-3">
             <p className="text-[13px] leading-relaxed text-muted-foreground">
-              Approving reveals the release secret, which is the only thing that can spend the HTLC.
-              It cannot be undone.
+              Approving releases the escrow to the freelancer, who then claims it into their
+              wallet. It cannot be undone.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={approve} disabled={busy !== null}>

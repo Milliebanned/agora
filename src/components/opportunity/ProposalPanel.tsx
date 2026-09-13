@@ -172,14 +172,14 @@ function ClientView({
 
       if (action === "accept") {
         const name = proposal.freelancer.displayName ?? "The freelancer";
-        let message = `${name} is in. Create the HTLC to lock ${bid.toFixed(2)} NIM on-chain — the chat is open in the meantime.`;
+        let message = `${name} is in. ${bid.toFixed(2)} NIM is held for this deal and the private chat is open.`;
         if (topupPaidNow) {
           message += ` You funded the extra amount above budget to make it happen.`;
         } else if (body?.refund?.ok) {
-          message += ` ${Number(body.refund.amountNIM).toFixed(2)} NIM was refunded to you — the accepted bid came in under budget.`;
+          message += ` ${Number(body.refund.amountNIM).toFixed(2)} NIM was refunded to you, since the accepted bid came in under budget.`;
         } else if (body?.refund && !body.refund.ok) {
           onError(
-            `Accepted, but the ${Number(body.refund.amountNIM).toFixed(2)} NIM refund for the difference could not be sent automatically — it will be sent by hand shortly.`,
+            `Accepted, but the ${Number(body.refund.amountNIM).toFixed(2)} NIM refund for the difference could not be sent automatically. It will be sent by hand shortly.`,
           );
         }
         onNotice(message);
