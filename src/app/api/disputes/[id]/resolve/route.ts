@@ -10,10 +10,31 @@ import { notifyMany, TABS } from '@/lib/notifications'
 // default. 60s is the Hobby-plan ceiling.
 export const maxDuration = 60
 
+// A cold serverless function opens a fresh connection to the pooler, and the
+// first query through it is the one that can time out while every later query
+// sails through. That is half of why the mediator failed on the first click
+// and worked on the second, so the queries either side of the model call get
+// one retry on the errors that mean "the connection was not ready", and none
+// on the errors that mean the query itself was wrong.
+const TRANSIENT_DB = /P1001|P1002|P1008|P1017|P2024|connection|timed out|ECONNRESET|terminating/i
+
+async function withColdStartRetry<T>(label: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (!TRANSIENT_DB.test(message)) throw err
+    console.warn(`[mediator] ${label} failed on a cold connection, retrying once: ${message.slice(0, 160)}`)
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return run()
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const startedAt = Date.now()
   try {
     const { id } = await params
     const session = request.cookies.get('session')?.value
@@ -26,12 +47,16 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
     }
 
-    const dispute = await prisma.dispute.findUnique({
+    const dispute = await withColdStartRetry('reading the dispute', () =>
+      prisma.dispute.findUnique({
       where: { id: id },
       include: {
         agreement: {
           include: {
-            messages: { orderBy: { createdAt: 'asc' } },
+            // Only what the mediator reads. It quotes the last 40, and
+            // pulling a whole thread to throw most of it away is time spent on
+            // the one request that can least afford it.
+            messages: { orderBy: { createdAt: 'desc' }, take: 40 },
             milestones: true,
             buyer: { select: { displayName: true } },
             seller: { select: { displayName: true } },
@@ -40,7 +65,8 @@ export async function POST(
         opener: { select: { displayName: true } },
         respondent: { select: { displayName: true } },
       },
-    })
+      }),
+    )
 
     if (!dispute) {
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
@@ -129,8 +155,10 @@ Refund terms: ${opportunity.refundTerms}
       .filter(Boolean)
       .join('\n')
 
-    const messages = opportunity.messages
-      .slice(-40)
+    const messages = [...opportunity.messages]
+      // Read back newest-first from the database, so put them in the order the
+      // conversation happened before handing them over.
+      .reverse()
       .map(
         (m) =>
           `[${formatDate(m.createdAt)}] ${m.type === 'system' ? 'SYSTEM' : m.senderId === opportunity.buyerId ? 'CLIENT' : 'FREELANCER'}: ${m.content}`,
@@ -171,7 +199,8 @@ Their reason: ${dispute.reason}
           : Math.max(0, Math.min(100, Math.round(verdict.freelancer_percent ?? 0)))
 
     // Update dispute with verdict
-    const updated = await prisma.dispute.update({
+    const updated = await withColdStartRetry('saving the verdict', () =>
+      prisma.dispute.update({
       where: { id: id },
       data: {
         status: 'under_review',
@@ -187,7 +216,8 @@ Their reason: ${dispute.reason}
         opener: { select: { displayName: true, id: true } },
         respondent: { select: { displayName: true, id: true } },
       },
-    })
+      }),
+    )
 
     // Add system message about verdict
     await prisma.message.create({
@@ -223,6 +253,7 @@ Their reason: ${dispute.reason}
     // rather than hiding behind "Internal server error".
     console.error('Resolve dispute error:', error)
     const detail = error instanceof Error ? error.message : String(error)
+    console.error(`[mediator] failed after ${Date.now() - startedAt}ms`)
     return NextResponse.json(
       {
         error: isGeminiConfigured() ? 'AI mediation failed' : 'GEMINI_API_KEY is not set',

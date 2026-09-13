@@ -103,17 +103,19 @@ async function generateJson<T>(
     maxOutputTokens: number
     thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high'
     attempts?: number
-    /** Stop starting new attempts past this many ms. Must sit inside the
-     *  route's maxDuration, or the retry itself becomes the timeout. */
-    budgetMs?: number
+    /** How long the whole call may take, including retries. Must sit inside
+     *  the route's maxDuration, leaving room for the work that follows it. */
+    deadlineMs?: number
   },
 ): Promise<T> {
   const attempts = opts.attempts ?? 3
-  const budgetMs = opts.budgetMs ?? 45_000
+  const deadlineMs = opts.deadlineMs ?? 45_000
   const startedAt = Date.now()
   let lastError: unknown
+  let lastAttemptMs = 0
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    const attemptStartedAt = Date.now()
     try {
       const interaction = await getGeminiClient().interactions.create({
         model,
@@ -149,16 +151,27 @@ async function generateJson<T>(
       )
       if (!retryable || attempt === attempts) break
 
-      // Retrying into a request that is about to be killed anyway just replaces
-      // a readable error with a gateway timeout.
-      const elapsed = Date.now() - startedAt
-      if (elapsed > budgetMs) {
-        console.warn(`[gemini] ${model} out of retry budget after ${elapsed}ms — surfacing the error`)
-        break
-      }
-
       // Back off a little between tries; a burst limit clears in about a second.
       const waitMs = 700 * attempt
+
+      // Retry when another attempt plausibly fits, judged against how long the
+      // one that just failed took rather than against a flat ceiling.
+      //
+      // This is what made the mediator fail on the first click and work on the
+      // second. The first call of the day is the slow one — a cold function, a
+      // cold connection, a first TLS handshake — and a flat 30s budget was
+      // spent by that single slow attempt, so the retry that exists precisely
+      // for this case was skipped and the error went to the user. The second
+      // click then ran warm and worked, which is exactly the pattern reported.
+      lastAttemptMs = Date.now() - attemptStartedAt
+      const elapsed = Date.now() - startedAt
+      const projected = elapsed + waitMs + lastAttemptMs
+      if (projected > deadlineMs) {
+        console.warn(
+          `[gemini] ${model} stopping after ${elapsed}ms: another attempt would take until ~${projected}ms, past the ${deadlineMs}ms deadline`,
+        )
+        break
+      }
       console.warn(
         `[gemini] ${model} attempt ${attempt}/${attempts} failed (${
           err instanceof Error ? err.message : String(err)
@@ -213,9 +226,12 @@ ${messages}
 === SUBMITTED WORK ===
 ${submittedWork}`,
     VERDICT_SCHEMA,
-    // Two attempts, not three: a mediation call with a thinking budget is slow
+    // A mediation call with a thinking budget is slow
     // enough that a third would outlive the route.
-    { maxOutputTokens: 1800, thinkingLevel: 'low', attempts: 2, budgetMs: 30_000 },
+    // Three attempts inside a deadline that leaves the route room to write the
+    // verdict away afterwards. The deadline, not the attempt count, is what
+    // keeps this inside the 60s the route is allowed.
+    { maxOutputTokens: 1800, thinkingLevel: 'low', attempts: 3, deadlineMs: 45_000 },
   )
 }
 
