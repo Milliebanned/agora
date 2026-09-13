@@ -76,7 +76,7 @@ function GitHubMark({ className }: { className?: string }) {
 
 // Outlined by default, and the outline only takes the brand colour on hover.
 const NAV_LINK =
-  'group flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-1.5 py-1.5 font-mono text-[11.5px] tracking-[0.04em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground disabled:opacity-50 sm:px-2.5 sm:text-[12px] sm:tracking-[0.06em]'
+  'group flex items-center gap-1 whitespace-nowrap rounded-md border border-border px-1.5 py-1.5 font-mono text-[10.5px] tracking-[0.01em] text-muted-foreground transition-colors hover:border-[#3bb143] hover:text-foreground disabled:opacity-50 sm:gap-1.5 sm:px-2.5 sm:text-[12px] sm:tracking-[0.06em]'
 
 const STEPS = [
   ['Connect', 'Sign in with your Nimiq Pay wallet. No password, no signup form.'],
@@ -107,7 +107,7 @@ export default function Home() {
   const BoardLink = ({ label, href }: { label: string; href: string }) => {
     const inner = (
       <>
-        <span className="text-subtle-foreground transition-colors group-hover:text-[#3bb143]">//</span>
+        <span className="hidden text-subtle-foreground transition-colors group-hover:text-[#3bb143] min-[360px]:inline">//</span>
         {label}
       </>
     )
@@ -125,11 +125,11 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-3 md:h-14 md:flex-nowrap md:py-0">
+        <div className="mx-auto flex max-w-content flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-14 md:flex-nowrap md:py-0">
           {/* Both boards are behind the wallet, so on a signed-out visit these
               ask for the wallet rather than leading somewhere that would just
               bounce them back. */}
-          <nav className="order-3 flex w-full flex-wrap items-center gap-1.5 md:order-1 md:w-auto md:flex-1 md:flex-nowrap md:gap-2">
+          <nav className="order-3 flex w-full items-center gap-1 md:order-1 md:w-auto md:flex-1 md:gap-2">
             <BoardLink label="Find work" href="/dashboard/opportunities" />
             <BoardLink label="Find workers" href="/dashboard/workers" />
             <a
@@ -138,7 +138,7 @@ export default function Home() {
               rel="noopener noreferrer"
               className={NAV_LINK}
             >
-              <span className="text-subtle-foreground transition-colors group-hover:text-[#3bb143]">//</span>
+              <span className="hidden text-subtle-foreground transition-colors group-hover:text-[#3bb143] min-[360px]:inline">//</span>
               Read docs
             </a>
             <a
