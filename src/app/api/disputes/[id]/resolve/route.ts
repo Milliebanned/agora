@@ -5,6 +5,7 @@ import { formatDate, parseJsonArray } from '@/lib/utils'
 import { categoryLabel, parseAttachments } from '@/lib/opportunities'
 import prisma from '@/lib/db'
 import { notifyMany, TABS } from '@/lib/notifications'
+import { disputeForViewer } from '@/lib/disputes'
 
 // Same reason as the agreement builder: a model call blows past Vercel's 10s
 // default. 60s is the Hobby-plan ceiling.
@@ -247,7 +248,12 @@ Their reason: ${dispute.reason}
       })),
     )
 
-    return NextResponse.json(updated)
+    // Re-read through the shared projection rather than returning the row that
+    // was just written. The page replaces its whole dispute with whatever comes
+    // back from here, so any field missing from it is one the next render
+    // reaches for and does not find.
+    const forPage = await disputeForViewer(id, user.userId)
+    return NextResponse.json(forPage.ok ? forPage.dispute : updated)
   } catch (error) {
     // The mediator is the headline feature, so a failure names its own cause
     // rather than hiding behind "Internal server error".
